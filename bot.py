@@ -3,7 +3,7 @@ from config import *
 from flask import Flask
 import threading
 
-# Flask app (fake web server)
+# ----------- FLASK SERVER (RENDER FIX) -----------
 web_app = Flask(__name__)
 
 @web_app.route('/')
@@ -13,7 +13,7 @@ def home():
 def run_web():
     web_app.run(host="0.0.0.0", port=10000)
 
-# Telegram bot
+# ----------- TELEGRAM BOT -----------
 app = Client(
     "bot",
     api_id=API_ID,
@@ -23,9 +23,9 @@ app = Client(
 
 @app.on_message(filters.command("start"))
 def start(_, message):
-    message.reply_text("🤖 Bot is Alive!")
+    message.reply_text("🤖 Bot is LIVE 🚀")
 
-# Run both
+# ----------- RUN BOTH -----------
 if __name__ == "__main__":
     threading.Thread(target=run_web).start()
     app.run()
