@@ -1,20 +1,20 @@
-from flask import Flask
-import threading
-
-web_app = Flask(__name__)
-
-@web_app.route("/")
-def home():
-    return "Bot Alive ✅"
-
-def run_web():
-    web_app.run(host="0.0.0.0", port=10000)
-    from pyrogram import Client, filters
+from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import *
 import os, re, time, threading
 from queue import Queue
 from pyrogram.errors import FloodWait
+from flask import Flask
+
+# -------- FLASK (RENDER FIX) --------
+web_app = Flask(__name__)
+
+@web_app.route('/')
+def home():
+    return "Bot Running ✅"
+
+def run_web():
+    web_app.run(host="0.0.0.0", port=10000)
 
 # -------- BOT --------
 app = Client(
@@ -42,9 +42,18 @@ def progress_bar(percent):
     left = 10 - done
     return "█" * done + "░" * left
 
-# -------- MAIN MENU --------
-def main_menu():
-    return InlineKeyboardMarkup([
+# -------- SAFE EDIT (FIX ERROR) --------
+def safe_edit(msg, text, reply_markup=None):
+    try:
+        msg.edit_text(text, reply_markup=reply_markup)
+    except:
+        pass
+
+# -------- START MENU --------
+@app.on_message(filters.command("start"))
+def start(_, message):
+
+    btn = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📁 Rename", callback_data="menu_rename"),
             InlineKeyboardButton("⚙ Settings", callback_data="menu_settings")
@@ -55,72 +64,45 @@ def main_menu():
         ]
     ])
 
-# -------- START --------
-@app.on_message(filters.command("start"))
-def start(_, message):
     message.reply_text(
-        "🔥 *AniToon PRO Bot*\n\nSelect an option:",
-        reply_markup=main_menu()
+        "🔥 *AniToon PRO Bot*\n\nSelect an option below:",
+        reply_markup=btn
     )
 
-# -------- BUTTON HANDLER --------
+# -------- MENU BUTTONS --------
 @app.on_callback_query()
 def buttons(_, query):
 
     data = query.data
     user_id = query.from_user.id
 
-    # -------- MENU --------
     if data == "menu_rename":
-        query.message.edit_text(
-            "📁 Send a file to rename",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Back", callback_data="back")]
-            ])
-        )
+        safe_edit(query.message, "📁 Send a file to rename")
 
     elif data == "menu_settings":
-        query.message.edit_text(
-            "⚙ Settings (Coming Soon)",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Back", callback_data="back")]
-            ])
-        )
+        safe_edit(query.message, "⚙ Settings coming soon...")
 
     elif data == "menu_status":
-        query.message.edit_text(
-            f"📊 Queue Size: {task_queue.qsize()}",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Back", callback_data="back")]
-            ])
-        )
+        safe_edit(query.message, f"📊 Queue Size: {task_queue.qsize()}")
 
     elif data == "menu_help":
-        query.message.edit_text(
-            "❓ Send file → Rename → Done",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Back", callback_data="back")]
-            ])
-        )
+        safe_edit(query.message, "❓ Send file → Rename → Done")
 
-    elif data == "back":
-        query.message.edit_text(
-            "🔥 *AniToon PRO Bot*",
-            reply_markup=main_menu()
-        )
-
-    # -------- RENAME FLOW --------
     elif data == "manual":
         user_steps[user_id] = "rename"
-        query.message.edit_text("✏ Send new name")
+        safe_edit(query.message, "✏ Send new name")
 
     elif data == "auto":
+        if user_id not in user_files:
+            safe_edit(query.message, "❌ Session expired")
+            return
+
         file_msg = user_files[user_id]
         file_name = file_msg.document.file_name if file_msg.document else "file"
         new_name = smart_name(os.path.splitext(file_name)[0])
 
         task_queue.put((file_msg, new_name, query.message))
-        query.message.edit_text("⏳ Added to queue...")
+        safe_edit(query.message, "⏳ Added to queue...")
 
 # -------- RECEIVE FILE --------
 @app.on_message(filters.document | filters.video | filters.audio)
@@ -198,20 +180,13 @@ def process_file(file_msg, new_name, msg):
         speed = current / (time.time() - start_time + 1)
         eta = (total - current) / (speed + 1)
 
-        try:
-            progress_msg.edit_text(
-                f"📥 Downloading...\n\n"
-                f"[{progress_bar(percent)}] {percent}%\n\n"
-                f"⚡ {round(speed/1024/1024,2)} MB/s | ⏳ {int(eta)}s",
-                reply_markup=InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33"),
-                        InlineKeyboardButton("❌ Cancel", callback_data="cancel")
-                    ]
-                ])
-            )
-        except:
-            pass
+        safe_edit(
+            progress_msg,
+            f"📥 Downloading...\n\n"
+            f"[{progress_bar(percent)}] {percent}%\n\n"
+            f"⚡ {round(speed/1024/1024,2)} MB/s\n"
+            f"⏳ {int(eta)} sec"
+        )
 
     file_path = file_msg.download(progress=progress)
 
@@ -234,20 +209,13 @@ def process_file(file_msg, new_name, msg):
         speed = current / (time.time() - up_start + 1)
         eta = (total - current) / (speed + 1)
 
-        try:
-            progress_msg.edit_text(
-                f"📤 Uploading...\n\n"
-                f"[{progress_bar(percent)}] {percent}%\n\n"
-                f"⚡ {round(speed/1024/1024,2)} MB/s | ⏳ {int(eta)}s",
-                reply_markup=InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33"),
-                        InlineKeyboardButton("❌ Cancel", callback_data="cancel")
-                    ]
-                ])
-            )
-        except:
-            pass
+        safe_edit(
+            progress_msg,
+            f"📤 Uploading...\n\n"
+            f"[{progress_bar(percent)}] {percent}%\n\n"
+            f"⚡ {round(speed/1024/1024,2)} MB/s\n"
+            f"⏳ {int(eta)} sec"
+        )
 
     file_msg.reply_document(
         new_file,
@@ -268,11 +236,8 @@ def process_file(file_msg, new_name, msg):
 # -------- RUN --------
 if __name__ == "__main__":
 
-    # Start worker
     threading.Thread(target=worker, daemon=True).start()
-
-    # Start Flask (IMPORTANT FOR RENDER)
-    threading.Thread(target=run_web).start()
+    threading.Thread(target=run_web, daemon=True).start()
 
     while True:
         try:
