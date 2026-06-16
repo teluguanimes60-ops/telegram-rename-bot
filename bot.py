@@ -29,30 +29,33 @@ app = Client(
 # -------- START --------
 @app.on_message(filters.command("start"))
 def start(_, message):
-    message.reply_text("🔥 PRO Rename Bot\n\nSend a file")
+    message.reply_text(
+        "🔥 PRO Rename Bot\n\n📁 Send a file"
+    )
 
-# -------- FILE RECEIVE --------
+# -------- FILE HANDLER --------
 @app.on_message(filters.document | filters.video | filters.audio)
 def file_handler(_, message):
 
     task_queue.put(message)
 
     message.reply_text(
-        "📥 Added to queue!\n⏳ Wait..."
+        f"📥 Added to queue\n⏳ Position: {task_queue.qsize()}"
     )
 
-# -------- PROCESS FUNCTION --------
+# -------- PROCESS --------
 def process_file(message):
 
     user_id = message.from_user.id
 
+    # ask name
     ask = message.reply_text("✏ Send new file name")
     new_msg = app.listen(user_id)
     new_name = new_msg.text
 
     progress_msg = message.reply_text("⏳ Starting...")
 
-    # Download
+    # download
     def progress(current, total):
         percent = int(current * 100 / total)
         progress_msg.edit_text(
@@ -64,12 +67,12 @@ def process_file(message):
 
     file_path = message.download(progress=progress)
 
-    # Rename
+    # rename
     ext = os.path.splitext(file_path)[1]
     new_file = f"{new_name}{ext}"
     os.rename(file_path, new_file)
 
-    # Upload
+    # upload
     def up_progress(current, total):
         percent = int(current * 100 / total)
         progress_msg.edit_text(
@@ -87,12 +90,12 @@ def process_file(message):
 # -------- WORKER --------
 def worker():
     while True:
-        message = task_queue.get()
+        msg = task_queue.get()
 
         try:
-            process_file(message)
+            process_file(msg)
         except Exception as e:
-            message.reply_text(f"❌ Error: {e}")
+            msg.reply_text(f"❌ Error: {e}")
 
         task_queue.task_done()
 
