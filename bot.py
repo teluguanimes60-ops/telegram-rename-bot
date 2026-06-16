@@ -27,81 +27,85 @@ app = Client(
     bot_token=BOT_TOKEN
 )
 
-# -------- USER STATES --------
+# -------- STATES --------
 user_files = {}
 user_steps = {}
 
-# -------- SMART RENAME --------
+# -------- SMART RENAME FUNCTION --------
 def smart_rename(filename):
-    name = filename.replace(".", " ").replace("_", " ")
+    name, ext = os.path.splitext(filename)
 
-    junk = ["x264", "AAC", "HDRip", "BluRay", "WEBRip"]
-    for j in junk:
-        name = name.replace(j, "")
+    # remove useless words
+    name = re.sub(r"(www\..*?\.)", "", name)
+    name = re.sub(r"[_\-\.]+", " ", name)
 
-    ep = re.search(r'(?:Ep|Episode)?\s?(\d+)', name, re.IGNORECASE)
-    quality = re.search(r'(\d{3,4}p)', name)
+    # clean extra spaces
+    name = " ".join(name.split())
 
-    title = name.strip()
-    new_name = title
-
-    if ep:
-        new_name += f" - Episode {ep.group(1)}"
-
-    if quality:
-        new_name += f" [{quality.group(1)}]"
-
-    return new_name
+    return name + ext
 
 # -------- START --------
 @app.on_message(filters.command("start"))
 def start(_, message):
-    message.reply_text("🔥 PRO Rename Bot\n\n📁 Send a file")
+    message.reply_text(
+        "🔥 **AniToon Pro Rename Bot**\n\n"
+        "📁 Send a file to start\n"
+        "⚡ Fast • Smart • No Limits"
+    )
 
-# -------- FILE RECEIVER (QUEUE) --------
+# -------- FILE RECEIVE --------
 @app.on_message(filters.document | filters.video | filters.audio)
 def file_handler(_, message):
 
-    queue.append(message)
-
-    position = len(queue)
-
-    message.reply_text(f"📥 Added to Queue!\n📍 Position: {position}")
-
-    process_queue()
-
-# -------- PROCESS QUEUE --------
-def process_queue():
-    global is_processing
-
-    if is_processing or not queue:
-        return
-
-    is_processing = True
-
-    while queue:
-        message = queue.popleft()
-        handle_file(message)
-
-    is_processing = False
-
-# -------- HANDLE FILE --------
-def handle_file(message):
-
     user_id = message.from_user.id
 
-    user_files[user_id] = message
-    user_steps[user_id] = "waiting_name"
+    queue.append(message)
+    position = len(queue)
 
-    # Suggest name
-    original = message.document.file_name if message.document else "file"
-    suggested = smart_rename(original)
+    user_files[user_id] = message
+    user_steps[user_id] = "waiting_button"
+
+    btn = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✨ Smart Rename", callback_data="smart"),
+            InlineKeyboardButton("✏ Manual Rename", callback_data="manual")
+        ]
+    ])
 
     message.reply_text(
-        f"✏ Send new file name\n\n💡 Suggested:\n`{suggested}`"
+        f"📥 **Added to Queue**\n📍 Position: {position}",
     )
 
-# -------- RENAME --------
+    message.reply_text(
+        "📁 **File Ready**\nChoose option:",
+        reply_markup=btn
+    )
+
+# -------- BUTTON --------
+@app.on_callback_query()
+def cb(_, query):
+
+    user_id = query.from_user.id
+
+    if user_id not in user_files:
+        query.answer("❌ Session expired", show_alert=True)
+        return
+
+    if query.data == "manual":
+        user_steps[user_id] = "waiting_name"
+        query.message.edit_text("✏ Send new file name")
+
+    elif query.data == "smart":
+        file_msg = user_files[user_id]
+        old_name = file_msg.document.file_name if file_msg.document else "file"
+
+        new_name = smart_rename(old_name)
+
+        query.message.edit_text(f"✨ Smart Name:\n\n`{new_name}`")
+
+        process_file(query.message, file_msg, new_name, user_id)
+
+# -------- TEXT RENAME --------
 @app.on_message(filters.text & ~filters.command("start"))
 def rename_handler(_, message):
 
@@ -114,19 +118,19 @@ def rename_handler(_, message):
         return
 
     file_msg = user_files[user_id]
-    original = file_msg.document.file_name if file_msg.document else "file"
+    new_name = message.text
 
-    # AUTO SMART
-    if message.text == ".":
-        new_name = smart_rename(original)
-    else:
-        new_name = message.text
+    process_file(message, file_msg, new_name, user_id)
+
+# -------- MAIN PROCESS --------
+def process_file(message, file_msg, new_name, user_id):
 
     progress_msg = message.reply_text("⏳ Starting...")
 
-    # DOWNLOAD
+    # DOWNLOAD PROGRESS
     def progress(current, total):
         percent = int(current * 100 / total)
+
         progress_msg.edit_text(
             f"📥 Downloading...\n\n🔄 {percent}%",
             reply_markup=InlineKeyboardMarkup([
@@ -141,9 +145,10 @@ def rename_handler(_, message):
     new_file = f"{new_name}{ext}"
     os.rename(file_path, new_file)
 
-    # UPLOAD
+    # UPLOAD PROGRESS
     def up_progress(current, total):
         percent = int(current * 100 / total)
+
         progress_msg.edit_text(
             f"📤 Uploading...\n\n🚀 {percent}%",
             reply_markup=InlineKeyboardMarkup([
@@ -151,14 +156,17 @@ def rename_handler(_, message):
             ])
         )
 
-    message.reply_document(new_file, progress=up_progress)
+    message.reply_document(
+        new_file,
+        caption="✅ Done!",
+        progress=up_progress
+    )
 
     progress_msg.delete()
 
     os.remove(new_file)
-
-    user_files.pop(user_id)
-    user_steps.pop(user_id)
+    user_files.pop(user_id, None)
+    user_steps.pop(user_id, None)
 
 # -------- RUN --------
 if __name__ == "__main__":
