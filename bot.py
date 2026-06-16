@@ -2,12 +2,11 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import *
 from flask import Flask
-import threading, os, re
+import threading, os, re, time
 from collections import deque
 
 # -------- QUEUE --------
 queue = deque()
-is_processing = False
 
 # -------- FLASK --------
 web_app = Flask(__name__)
@@ -31,26 +30,21 @@ app = Client(
 user_files = {}
 user_steps = {}
 
-# -------- SMART RENAME FUNCTION --------
+# -------- SMART RENAME --------
 def smart_rename(filename):
     name, ext = os.path.splitext(filename)
-
-    # remove useless words
     name = re.sub(r"(www\..*?\.)", "", name)
     name = re.sub(r"[_\-\.]+", " ", name)
-
-    # clean extra spaces
     name = " ".join(name.split())
-
     return name + ext
 
 # -------- START --------
 @app.on_message(filters.command("start"))
 def start(_, message):
     message.reply_text(
-        "🔥 **AniToon Pro Rename Bot**\n\n"
-        "📁 Send a file to start\n"
-        "⚡ Fast • Smart • No Limits"
+        "🔥 **AniToon Pro Bot**\n\n"
+        "📁 Send file to start\n"
+        "⚡ Fast • Smart • Pro"
     )
 
 # -------- FILE RECEIVE --------
@@ -59,9 +53,6 @@ def file_handler(_, message):
 
     user_id = message.from_user.id
 
-    queue.append(message)
-    position = len(queue)
-
     user_files[user_id] = message
     user_steps[user_id] = "waiting_button"
 
@@ -69,19 +60,18 @@ def file_handler(_, message):
         [
             InlineKeyboardButton("✨ Smart Rename", callback_data="smart"),
             InlineKeyboardButton("✏ Manual Rename", callback_data="manual")
+        ],
+        [
+            InlineKeyboardButton("📊 File Info", callback_data="info")
         ]
     ])
 
     message.reply_text(
-        f"📥 **Added to Queue**\n📍 Position: {position}",
-    )
-
-    message.reply_text(
-        "📁 **File Ready**\nChoose option:",
+        "📁 File received!\nChoose option:",
         reply_markup=btn
     )
 
-# -------- BUTTON --------
+# -------- BUTTON HANDLER --------
 @app.on_callback_query()
 def cb(_, query):
 
@@ -97,13 +87,19 @@ def cb(_, query):
 
     elif query.data == "smart":
         file_msg = user_files[user_id]
-        old_name = file_msg.document.file_name if file_msg.document else "file"
+
+        file = file_msg.document or file_msg.video or file_msg.audio
+        old_name = file.file_name if file.file_name else "file"
 
         new_name = smart_rename(old_name)
 
         query.message.edit_text(f"✨ Smart Name:\n\n`{new_name}`")
 
         process_file(query.message, file_msg, new_name, user_id)
+
+    elif query.data == "info":
+        user_steps[user_id] = "waiting_info"
+        query.message.edit_text("📊 Send file again to get info")
 
 # -------- TEXT RENAME --------
 @app.on_message(filters.text & ~filters.command("start"))
@@ -122,15 +118,13 @@ def rename_handler(_, message):
 
     process_file(message, file_msg, new_name, user_id)
 
-# -------- MAIN PROCESS --------
+# -------- PROCESS FILE --------
 def process_file(message, file_msg, new_name, user_id):
 
-    import time
-
     start_time = time.time()
-    progress_msg = message.reply_text("⏳ Initializing...")
+    progress_msg = message.reply_text("⏳ Starting...")
 
-    # -------- DOWNLOAD PROGRESS --------
+    # DOWNLOAD
     def progress(current, total):
         now = time.time()
         diff = now - start_time
@@ -139,74 +133,14 @@ def process_file(message, file_msg, new_name, user_id):
             return
 
         speed = current / diff
-        percentage = current * 100 / total
-        elapsed = diff
+        percent = current * 100 / total
         remaining = (total - current) / speed if speed > 0 else 0
 
         progress_msg.edit_text(
-            f"📥 **Downloading File**\n\n"
-            f"🔄 Progress: {percentage:.1f}%\n"
-            f"⚡ Speed: {speed/1024/1024:.2f} MB/s\n"
-            f"⏱ Done: {int(elapsed)} sec\n"
-            f"⌛ Left: {int(remaining)} sec",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
-            ])
-        )
-
-    file_path = file_msg.download(progress=progress)
-
-    # -------- RENAME --------
-    ext = os.path.splitext(file_path)[1]
-    new_file = f"{new_name}{ext}"
-    os.rename(file_path, new_file)
-
-    upload_start = time.time()
-
-    # -------- UPLOAD PROGRESS --------
-    def up_progress(current, total):
-        now = time.time()
-        diff = now - upload_start
-
-        if diff == 0:
-            return
-
-        speed = current / diff
-        percentage = current * 100 / total
-        elapsed = diff
-        remaining = (total - current) / speed if speed > 0 else 0
-
-        progress_msg.edit_text(
-            f"📤 **Uploading File**\n\n"
-            f"🚀 Progress: {percentage:.1f}%\n"
-            f"⚡ Speed: {speed/1024/1024:.2f} MB/s\n"
-            f"⏱ Done: {int(elapsed)} sec\n"
-            f"⌛ Left: {int(remaining)} sec",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
-            ])
-        )
-
-    message.reply_document(
-        new_file,
-        caption="✅ **Renamed Successfully!**",
-        progress=up_progress
-    )
-
-    progress_msg.delete()
-
-    os.remove(new_file)
-    user_files.pop(user_id, None)
-    user_steps.pop(user_id, None)
-
-    progress_msg = message.reply_text("⏳ Starting...")
-
-    # DOWNLOAD PROGRESS
-    def progress(current, total):
-        percent = int(current * 100 / total)
-
-        progress_msg.edit_text(
-            f"📥 Downloading...\n\n🔄 {percent}%",
+            f"📥 **Downloading**\n\n"
+            f"🔄 {percent:.1f}%\n"
+            f"⚡ {speed/1024/1024:.2f} MB/s\n"
+            f"⌛ {int(remaining)} sec left",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
             ])
@@ -219,12 +153,25 @@ def process_file(message, file_msg, new_name, user_id):
     new_file = f"{new_name}{ext}"
     os.rename(file_path, new_file)
 
-    # UPLOAD PROGRESS
+    upload_start = time.time()
+
+    # UPLOAD
     def up_progress(current, total):
-        percent = int(current * 100 / total)
+        now = time.time()
+        diff = now - upload_start
+
+        if diff == 0:
+            return
+
+        speed = current / diff
+        percent = current * 100 / total
+        remaining = (total - current) / speed if speed > 0 else 0
 
         progress_msg.edit_text(
-            f"📤 Uploading...\n\n🚀 {percent}%",
+            f"📤 **Uploading**\n\n"
+            f"🚀 {percent:.1f}%\n"
+            f"⚡ {speed/1024/1024:.2f} MB/s\n"
+            f"⌛ {int(remaining)} sec left",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
             ])
@@ -237,9 +184,43 @@ def process_file(message, file_msg, new_name, user_id):
     )
 
     progress_msg.delete()
-
     os.remove(new_file)
+
     user_files.pop(user_id, None)
+    user_steps.pop(user_id, None)
+
+# -------- INFO SYSTEM --------
+@app.on_message(filters.document | filters.video | filters.audio)
+def info_handler(_, message):
+
+    user_id = message.from_user.id
+
+    if user_steps.get(user_id) != "waiting_info":
+        return
+
+    msg = message.reply_text("🔍 Analyzing...")
+
+    file = message.document or message.video or message.audio
+
+    name = file.file_name if file.file_name else "Unknown"
+    size = round(file.file_size / (1024 * 1024), 2)
+
+    text = (
+        f"📊 **File Info**\n\n"
+        f"📁 Name: `{name}`\n"
+        f"📦 Size: {size} MB\n"
+    )
+
+    if message.video:
+        text += f"⏱ Duration: {message.video.duration} sec\n"
+
+    if message.audio:
+        text += f"🎵 Duration: {message.audio.duration} sec\n"
+
+    text += "\n⚠️ Languages & subtitles coming next..."
+
+    msg.edit_text(text)
+
     user_steps.pop(user_id, None)
 
 # -------- RUN --------
