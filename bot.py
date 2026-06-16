@@ -125,6 +125,80 @@ def rename_handler(_, message):
 # -------- MAIN PROCESS --------
 def process_file(message, file_msg, new_name, user_id):
 
+    import time
+
+    start_time = time.time()
+    progress_msg = message.reply_text("⏳ Initializing...")
+
+    # -------- DOWNLOAD PROGRESS --------
+    def progress(current, total):
+        now = time.time()
+        diff = now - start_time
+
+        if diff == 0:
+            return
+
+        speed = current / diff
+        percentage = current * 100 / total
+        elapsed = diff
+        remaining = (total - current) / speed if speed > 0 else 0
+
+        progress_msg.edit_text(
+            f"📥 **Downloading File**\n\n"
+            f"🔄 Progress: {percentage:.1f}%\n"
+            f"⚡ Speed: {speed/1024/1024:.2f} MB/s\n"
+            f"⏱ Done: {int(elapsed)} sec\n"
+            f"⌛ Left: {int(remaining)} sec",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
+            ])
+        )
+
+    file_path = file_msg.download(progress=progress)
+
+    # -------- RENAME --------
+    ext = os.path.splitext(file_path)[1]
+    new_file = f"{new_name}{ext}"
+    os.rename(file_path, new_file)
+
+    upload_start = time.time()
+
+    # -------- UPLOAD PROGRESS --------
+    def up_progress(current, total):
+        now = time.time()
+        diff = now - upload_start
+
+        if diff == 0:
+            return
+
+        speed = current / diff
+        percentage = current * 100 / total
+        elapsed = diff
+        remaining = (total - current) / speed if speed > 0 else 0
+
+        progress_msg.edit_text(
+            f"📤 **Uploading File**\n\n"
+            f"🚀 Progress: {percentage:.1f}%\n"
+            f"⚡ Speed: {speed/1024/1024:.2f} MB/s\n"
+            f"⏱ Done: {int(elapsed)} sec\n"
+            f"⌛ Left: {int(remaining)} sec",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
+            ])
+        )
+
+    message.reply_document(
+        new_file,
+        caption="✅ **Renamed Successfully!**",
+        progress=up_progress
+    )
+
+    progress_msg.delete()
+
+    os.remove(new_file)
+    user_files.pop(user_id, None)
+    user_steps.pop(user_id, None)
+
     progress_msg = message.reply_text("⏳ Starting...")
 
     # DOWNLOAD PROGRESS
