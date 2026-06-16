@@ -176,4 +176,13 @@ def process_file(file_msg, new_name, msg):
 if __name__ == "__main__":
     threading.Thread(target=run_web).start()
     print("BOT RUNNING...")
-    app.run()
+import time
+from pyrogram.errors import FloodWait
+
+while True:
+    try:
+        print("Starting bot...")
+        app.run()
+    except FloodWait as e:
+        print(f"FloodWait: sleeping {e.value} seconds")
+        time.sleep(e.value)
