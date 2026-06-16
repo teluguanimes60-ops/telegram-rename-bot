@@ -1,4 +1,4 @@
 API_ID = "33341376"
 API_HASH = "3e225fe3d916d2e2df1c8887e31e713d"
 BOT_TOKEN = "8732705270:AAGjfcMZyggreDaNa8irOnpTpmzvN-9ZBuI"
-MONGO_URL = "your_mongodb_url"
+MONGO_URL = "mongodb+srv://teluguanimes60_db_user:MonkeyDLuffy@cluster0.qm6qxq3.mongodb.net/?appName=Cluster0"
