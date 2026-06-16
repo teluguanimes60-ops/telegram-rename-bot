@@ -6,11 +6,11 @@ import os, re, time, threading
 from queue import Queue
 from flask import Flask
 
-# ================== SETTINGS ==================
+# ===== SETTINGS =====
 CHANNEL = "Anitoon_edit"
 CHANNEL_POST = "https://t.me/Anitoon_edit/33"
 
-# ================== FLASK ==================
+# ===== FLASK =====
 web_app = Flask(__name__)
 
 @web_app.route('/')
@@ -20,20 +20,15 @@ def home():
 def run_web():
     web_app.run(host="0.0.0.0", port=10000)
 
-# ================== BOT ==================
-app = Client(
-    "bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN
-)
+# ===== BOT =====
+app = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# ================== DATA ==================
+# ===== DATA =====
 task_queue = Queue()
 user_files = {}
 user_steps = {}
 
-# ================== JOIN CHECK ==================
+# ===== JOIN CHECK =====
 def is_joined(client, user_id):
     try:
         client.get_chat_member(CHANNEL, user_id)
@@ -43,22 +38,17 @@ def is_joined(client, user_id):
     except:
         return True
 
-# ================== SMART RENAME ==================
+# ===== SMART RENAME =====
 def smart_name(name):
     name = re.sub(r'@\w+', '', name)
     name = re.sub(r'https?://\S+|www\.\S+', '', name)
-    name = re.sub(r'\b(480p|720p|1080p|4k|HDRip|WEBRip|BluRay|x264|x265|HEVC)\b', '', name, flags=re.I)
+    name = re.sub(r'\b(480p|720p|1080p|4k|HDRip|WEBRip|BluRay|x264|x265)\b', '', name, flags=re.I)
     name = re.sub(r'\[.*?\]|\(.*?\)', '', name)
     name = re.sub(r'[._\-]', ' ', name)
     name = re.sub(r'\s+', ' ', name)
+    return name.strip().title() or "AniToon_File"
 
-    name = name.strip()
-    if not name:
-        name = "AniToon_File"
-
-    return name.title()
-
-# ================== UI ==================
+# ===== UI =====
 def progress_bar(p):
     return "█" * int(p/10) + "░" * (10-int(p/10))
 
@@ -73,7 +63,25 @@ def safe_edit(msg, text, btn=None):
     except:
         pass
 
-# ================== START ==================
+# ===== MAIN MENU =====
+def main_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📁 Rename", callback_data="menu_rename")],
+        [InlineKeyboardButton("🎬 Video Tools", callback_data="menu_video")],
+        [InlineKeyboardButton("⚙ Settings", callback_data="menu_settings")],
+        [InlineKeyboardButton("📊 Status", callback_data="menu_status")],
+        [InlineKeyboardButton("❓ Help", callback_data="menu_help")]
+    ])
+
+# ===== VIDEO MENU =====
+def video_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎞 Convert", callback_data="video_convert")],
+        [InlineKeyboardButton("🖼 Thumbnail Info", callback_data="video_thumb")],
+        [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
+    ])
+
+# ===== START =====
 @app.on_message(filters.command("start"))
 def start(client, message):
 
@@ -86,28 +94,31 @@ def start(client, message):
         )
         return
 
-    btn = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📁 Rename", callback_data="menu_rename")],
-        [InlineKeyboardButton("📊 Status", callback_data="menu_status")],
-        [InlineKeyboardButton("❓ Help", callback_data="menu_help")]
-    ])
+    message.reply_text("🔥 *AniToon PRO Bot*\n\nSelect option:", reply_markup=main_menu())
 
-    message.reply_text("🔥 *AniToon PRO Bot*", reply_markup=btn)
-
-# ================== BUTTONS ==================
+# ===== BUTTONS =====
 @app.on_callback_query()
 def buttons(client, query):
 
     user_id = query.from_user.id
+    data = query.data
 
     if not is_joined(client, user_id):
         safe_edit(query.message, "🚫 Join Channel First")
         return
 
-    data = query.data
+    # MAIN MENU NAVIGATION
+    if data == "back_main":
+        safe_edit(query.message, "🏠 Main Menu", main_menu())
 
-    if data == "menu_rename":
-        safe_edit(query.message, "📁 Send a file")
+    elif data == "menu_rename":
+        safe_edit(query.message, "📁 Send a file to rename")
+
+    elif data == "menu_video":
+        safe_edit(query.message, "🎬 Video Tools", video_menu())
+
+    elif data == "menu_settings":
+        safe_edit(query.message, "⚙ Settings coming soon")
 
     elif data == "menu_status":
         safe_edit(query.message, f"📊 Queue: {task_queue.qsize()}")
@@ -115,6 +126,14 @@ def buttons(client, query):
     elif data == "menu_help":
         safe_edit(query.message, "Send file → choose rename → done")
 
+    # VIDEO FEATURES
+    elif data == "video_convert":
+        safe_edit(query.message, "🎞 Convert feature coming soon")
+
+    elif data == "video_thumb":
+        safe_edit(query.message, "🖼 Thumbnail auto used in uploads")
+
+    # RENAME
     elif data == "manual":
         user_steps[user_id] = "rename"
         safe_edit(query.message, "✏ Send new name")
@@ -134,7 +153,7 @@ def buttons(client, query):
 
         safe_edit(query.message, f"⏳ Added\n📍 Position: {pos}")
 
-# ================== FILE ==================
+# ===== FILE =====
 @app.on_message(filters.document | filters.video | filters.audio)
 def file_handler(client, message):
 
@@ -146,7 +165,7 @@ def file_handler(client, message):
     user_files[user_id] = message
     user_steps[user_id] = "choose"
 
-    name = message.document.file_name
+    name = message.document.file_name if message.document else "file"
     suggested = smart_name(os.path.splitext(name)[0])
 
     btn = InlineKeyboardMarkup([
@@ -158,7 +177,7 @@ def file_handler(client, message):
 
     message.reply_text(f"💡 Suggested:\n`{suggested}`", reply_markup=btn)
 
-# ================== TEXT ==================
+# ===== TEXT =====
 @app.on_message(filters.text & ~filters.command("start"))
 def rename_handler(_, message):
 
@@ -178,7 +197,7 @@ def rename_handler(_, message):
 
     message.reply_text(f"⏳ Added\n📍 Position: {pos}")
 
-# ================== WORKER ==================
+# ===== WORKER =====
 def worker():
     while True:
         file_msg, new_name, msg = task_queue.get()
@@ -188,7 +207,7 @@ def worker():
             msg.reply_text(f"❌ {e}")
         task_queue.task_done()
 
-# ================== PROCESS ==================
+# ===== PROCESS =====
 def process_file(file_msg, new_name, msg):
 
     progress_msg = msg.reply_text("⏳ Starting...", reply_markup=progress_btn())
@@ -209,10 +228,7 @@ def process_file(file_msg, new_name, msg):
 
         safe_edit(
             progress_msg,
-            f"📥 Downloading...\n\n"
-            f"[{progress_bar(p)}] {p}%\n"
-            f"⚡ {round(speed/1024/1024,2)} MB/s\n"
-            f"⏳ {int(eta)} sec",
+            f"📥 Downloading...\n\n[{progress_bar(p)}] {p}%\n⚡ {round(speed/1024/1024,2)} MB/s\n⏳ {int(eta)} sec",
             progress_btn()
         )
 
@@ -222,25 +238,11 @@ def process_file(file_msg, new_name, msg):
     new_file = f"{new_name}{ext}"
     os.rename(file_path, new_file)
 
-    thumb = None
-    if file_msg.video and file_msg.video.thumbs:
-        thumb = file_msg.download(file_msg.video.thumbs[0].file_id)
-
     def up(c, t):
         p = int(c*100/t)
+        safe_edit(progress_msg, f"📤 Uploading...\n\n[{progress_bar(p)}] {p}%", progress_btn())
 
-        safe_edit(
-            progress_msg,
-            f"📤 Uploading...\n\n[{progress_bar(p)}] {p}%",
-            progress_btn()
-        )
-
-    file_msg.reply_document(
-        new_file,
-        caption=f"✅ {new_name}",
-        thumb=thumb,
-        progress=up
-    )
+    file_msg.reply_document(new_file, caption=f"✅ {new_name}", progress=up)
 
     try:
         progress_msg.delete()
@@ -248,10 +250,8 @@ def process_file(file_msg, new_name, msg):
         pass
 
     os.remove(new_file)
-    if thumb:
-        os.remove(thumb)
 
-# ================== RUN ==================
+# ===== RUN =====
 if __name__ == "__main__":
 
     threading.Thread(target=worker, daemon=True).start()
