@@ -1,4 +1,15 @@
-from pyrogram import Client, filters
+from flask import Flask
+import threading
+
+web_app = Flask(__name__)
+
+@web_app.route("/")
+def home():
+    return "Bot Alive ✅"
+
+def run_web():
+    web_app.run(host="0.0.0.0", port=10000)
+    from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import *
 import os, re, time, threading
@@ -257,7 +268,11 @@ def process_file(file_msg, new_name, msg):
 # -------- RUN --------
 if __name__ == "__main__":
 
+    # Start worker
     threading.Thread(target=worker, daemon=True).start()
+
+    # Start Flask (IMPORTANT FOR RENDER)
+    threading.Thread(target=run_web).start()
 
     while True:
         try:
