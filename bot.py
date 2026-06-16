@@ -5,6 +5,11 @@ from flask import Flask
 import threading, os
 from queue import Queue
 
+from collections import deque
+
+queue = deque()
+is_processing = False
+
 # -------- QUEUE SYSTEM --------
 task_queue = Queue()
 
@@ -31,10 +36,20 @@ user_files = {}
 user_steps = {}
 
 # -------- START --------
-@app.on_message(filters.command("start"))
-def start(_, message):
+@app.on_message(filters.document | filters.video | filters.audio)
+def file_handler(_, message):
+
+    queue.append(message)
+
+    position = len(queue)
+
     message.reply_text(
-        "🔥 PRO Rename Bot\n\n📁 Send a file to start"
+        f"📥 Added to Queue!\n📍 Position: {position}"
+    )
+
+    process_queue()
+    message.reply_text(
+        "🔥 AniToon's Rename Bot\n\n📁 Send a file to start"
     )
 
 # -------- RECEIVE FILE --------
@@ -124,6 +139,36 @@ def rename_handler(_, message):
     user_files.pop(user_id)
     user_steps.pop(user_id)
 
+# -------- QUEUE PROCESS --------
+def process_queue():
+    global is_processing
+
+    if is_processing or not queue:
+        return
+
+    is_processing = True
+
+    while queue:
+        message = queue.popleft()
+
+        try:
+            handle_file(message)
+        except Exception as e:
+            message.reply_text(f"❌ Error: {e}")
+
+    is_processing = False
+
+
+# -------- HANDLE FILE --------
+def handle_file(message):
+
+    user_id = message.from_user.id
+
+    user_files[user_id] = message
+    user_steps[user_id] = "waiting_name"
+
+    message.reply_text("✏ Send new file name")
+    
 # -------- RUN --------
 if __name__ == "__main__":
     threading.Thread(target=run_web).start()
