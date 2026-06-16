@@ -115,6 +115,47 @@ def rename(_, message):
     user_files.pop(user_id)
 
 # -------- RUN --------
+def process_file(message):
+
+    user_id = message.from_user.id
+
+    msg = message.reply_text("✏ Send new name")
+
+    new_msg = app.listen(user_id)
+    new_name = new_msg.text
+
+    progress_msg = message.reply_text("⏳ Starting...")
+
+    def progress(current, total):
+        percent = int(current * 100 / total)
+        progress_msg.edit_text(f"📥 Downloading...\n\n{percent}%")
+
+    file_path = message.download(progress=progress)
+
+    ext = os.path.splitext(file_path)[1]
+    new_file = f"{new_name}{ext}"
+    os.rename(file_path, new_file)
+
+    def up_progress(current, total):
+        percent = int(current * 100 / total)
+        progress_msg.edit_text(f"📤 Uploading...\n\n{percent}%")
+
+    message.reply_document(new_file, progress=up_progress)
+
+    progress_msg.delete()
+    os.remove(new_file)
+
+
+def worker():
+    while True:
+        message = task_queue.get()
+
+        try:
+            process_file(message)
+        except Exception as e:
+            message.reply_text(f"❌ Error: {e}")
+
+        task_queue.task_done()
 if __name__ == "__main__":
     threading.Thread(target=run_web).start()
     app.run()
