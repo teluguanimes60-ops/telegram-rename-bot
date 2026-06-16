@@ -181,8 +181,8 @@ from pyrogram.errors import FloodWait
 
 while True:
     try:
-        print("Starting bot...")
+        print("🚀 Starting bot...")
         app.run()
     except FloodWait as e:
-        print(f"FloodWait: sleeping {e.value} seconds")
+        print(f"⚠️ FloodWait: sleeping {e.value} seconds")
         time.sleep(e.value)
