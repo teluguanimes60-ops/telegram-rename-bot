@@ -31,9 +31,17 @@ user_steps = {}
 
 # -------- SMART RENAME --------
 def smart_name(name):
+
+    # Remove @words (like @channel, @abc123)
+    name = re.sub(r'@\w+', '', name)
+
+    # Remove dots, underscores, hyphens
     name = re.sub(r'\.', ' ', name)
     name = re.sub(r'[_\-]', ' ', name)
+
+    # Remove extra spaces
     name = re.sub(r'\s+', ' ', name)
+
     return name.strip().title()
 
 # -------- PROGRESS BAR --------
