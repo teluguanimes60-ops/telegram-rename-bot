@@ -1,4 +1,4 @@
-API_ID = "your_api_id"
-API_HASH = "your_api_hash"
-BOT_TOKEN = "your_bot_token"
+API_ID = "33341376"
+API_HASH = "3e225fe3d916d2e2df1c8887e31e713d"
+BOT_TOKEN = "8732705270:AAGjfcMZyggreDaNa8irOnpTpmzvN-9ZBuI"
 MONGO_URL = "your_mongodb_url"
