@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-from pyrogram.types import Message
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from config import *
 import os
 
@@ -10,15 +10,15 @@ app = Client(
     bot_token=BOT_TOKEN
 )
 
-# Store user state (simple memory)
+# Store user states
 user_state = {}
 
 # ---------------- START ----------------
 @app.on_message(filters.command("start"))
 def start(_, message):
     message.reply_text(
-        "🤖 Rename Bot Ready!\n\n"
-        "📁 Send any file to rename it."
+        "🤖 PRO Rename Bot Ready!\n\n"
+        "📁 Send a file to start."
     )
 
 # ---------------- FILE RECEIVER ----------------
@@ -27,25 +27,56 @@ def get_file(_, message: Message):
 
     user_id = message.from_user.id
 
-    # Save file info
     user_state[user_id] = {
-        "file_id": message.id,
-        "file": message
+        "file": message,
+        "step": "choose"
     }
 
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✏ Rename", callback_data="rename"),
+            InlineKeyboardButton("❌ Cancel", callback_data="cancel")
+        ]
+    ])
+
     message.reply_text(
-        "📁 File received!\n\n"
-        "✏ Now send new file name (without extension)"
+        "📁 File received!\n\nChoose option:",
+        reply_markup=buttons
     )
 
-# ---------------- RENAME HANDLER ----------------
+# ---------------- BUTTON HANDLER ----------------
+@app.on_callback_query()
+def callback(_, query: CallbackQuery):
+
+    user_id = query.from_user.id
+
+    if query.data == "cancel":
+        user_state.pop(user_id, None)
+        query.message.edit_text("❌ Cancelled")
+        return
+
+    if query.data == "rename":
+        if user_id not in user_state:
+            query.message.edit_text("❌ No file found")
+            return
+
+        user_state[user_id]["step"] = "rename"
+
+        query.message.edit_text(
+            "✏ Send new file name (without extension)"
+        )
+
+# ---------------- TEXT HANDLER ----------------
 @app.on_message(filters.text & ~filters.command("start"))
-def rename_file(_, message: Message):
+def rename_handler(_, message: Message):
 
     user_id = message.from_user.id
 
     if user_id not in user_state:
-        return message.reply_text("❌ First send a file!")
+        return
+
+    if user_state[user_id]["step"] != "rename":
+        return
 
     new_name = message.text
     file_msg = user_state[user_id]["file"]
@@ -63,14 +94,11 @@ def rename_file(_, message: Message):
     # Send renamed file
     message.reply_document(
         document=new_file_path,
-        caption="✅ Renamed successfully!"
-
+        caption="✅ Renamed Successfully!"
     )
 
-    # Clear state
-    del user_state[user_id]
-
-    # Delete temp file
+    # Cleanup
     os.remove(new_file_path)
+    user_state.pop(user_id, None)
 
 app.run()
