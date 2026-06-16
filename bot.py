@@ -1,16 +1,16 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import FloodWait, UserNotParticipant
 from config import *
 import os, re, time, threading
 from queue import Queue
-from pyrogram.errors import FloodWait, UserNotParticipant
 from flask import Flask
 
-# -------- SETTINGS --------
+# ================== SETTINGS ==================
 CHANNEL = "Anitoon_edit"
 CHANNEL_POST = "https://t.me/Anitoon_edit/33"
 
-# -------- FLASK --------
+# ================== FLASK ==================
 web_app = Flask(__name__)
 
 @web_app.route('/')
@@ -20,7 +20,7 @@ def home():
 def run_web():
     web_app.run(host="0.0.0.0", port=10000)
 
-# -------- BOT --------
+# ================== BOT ==================
 app = Client(
     "bot",
     api_id=API_ID,
@@ -28,12 +28,12 @@ app = Client(
     bot_token=BOT_TOKEN
 )
 
-# -------- DATA --------
+# ================== DATA ==================
 task_queue = Queue()
 user_files = {}
 user_steps = {}
 
-# -------- FORCE JOIN --------
+# ================== JOIN CHECK ==================
 def is_joined(client, user_id):
     try:
         client.get_chat_member(CHANNEL, user_id)
@@ -43,11 +43,11 @@ def is_joined(client, user_id):
     except:
         return True
 
-# -------- SMART RENAME --------
+# ================== SMART RENAME ==================
 def smart_name(name):
     name = re.sub(r'@\w+', '', name)
     name = re.sub(r'https?://\S+|www\.\S+', '', name)
-    name = re.sub(r'\b(480p|720p|1080p|4k|HDRip|WEBRip|BluRay|x264|x265)\b', '', name, flags=re.I)
+    name = re.sub(r'\b(480p|720p|1080p|4k|HDRip|WEBRip|BluRay|x264|x265|HEVC)\b', '', name, flags=re.I)
     name = re.sub(r'\[.*?\]|\(.*?\)', '', name)
     name = re.sub(r'[._\-]', ' ', name)
     name = re.sub(r'\s+', ' ', name)
@@ -58,7 +58,7 @@ def smart_name(name):
 
     return name.title()
 
-# -------- UI --------
+# ================== UI ==================
 def progress_bar(p):
     return "█" * int(p/10) + "░" * (10-int(p/10))
 
@@ -67,13 +67,13 @@ def progress_btn():
         [InlineKeyboardButton("📢 AniToon's Channel List", url=CHANNEL_POST)]
     ])
 
-def safe_edit(msg, text):
+def safe_edit(msg, text, btn=None):
     try:
-        msg.edit_text(text, reply_markup=progress_btn())
+        msg.edit_text(text, reply_markup=btn)
     except:
         pass
 
-# -------- START --------
+# ================== START ==================
 @app.on_message(filters.command("start"))
 def start(client, message):
 
@@ -86,9 +86,55 @@ def start(client, message):
         )
         return
 
-    message.reply_text("🔥 Send file to rename")
+    btn = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📁 Rename", callback_data="menu_rename")],
+        [InlineKeyboardButton("📊 Status", callback_data="menu_status")],
+        [InlineKeyboardButton("❓ Help", callback_data="menu_help")]
+    ])
 
-# -------- FILE --------
+    message.reply_text("🔥 *AniToon PRO Bot*", reply_markup=btn)
+
+# ================== BUTTONS ==================
+@app.on_callback_query()
+def buttons(client, query):
+
+    user_id = query.from_user.id
+
+    if not is_joined(client, user_id):
+        safe_edit(query.message, "🚫 Join Channel First")
+        return
+
+    data = query.data
+
+    if data == "menu_rename":
+        safe_edit(query.message, "📁 Send a file")
+
+    elif data == "menu_status":
+        safe_edit(query.message, f"📊 Queue: {task_queue.qsize()}")
+
+    elif data == "menu_help":
+        safe_edit(query.message, "Send file → choose rename → done")
+
+    elif data == "manual":
+        user_steps[user_id] = "rename"
+        safe_edit(query.message, "✏ Send new name")
+
+    elif data == "auto":
+
+        if user_id not in user_files:
+            safe_edit(query.message, "❌ Session expired")
+            return
+
+        file_msg = user_files[user_id]
+        name = file_msg.document.file_name
+        new_name = smart_name(os.path.splitext(name)[0])
+
+        pos = task_queue.qsize() + 1
+        task_queue.put((file_msg, new_name, query.message))
+
+        safe_edit(query.message, f"⏳ Added\n📍 Position: {pos}")
+
+# ================== FILE ==================
 @app.on_message(filters.document | filters.video | filters.audio)
 def file_handler(client, message):
 
@@ -98,6 +144,7 @@ def file_handler(client, message):
 
     user_id = message.from_user.id
     user_files[user_id] = message
+    user_steps[user_id] = "choose"
 
     name = message.document.file_name
     suggested = smart_name(os.path.splitext(name)[0])
@@ -111,32 +158,7 @@ def file_handler(client, message):
 
     message.reply_text(f"💡 Suggested:\n`{suggested}`", reply_markup=btn)
 
-# -------- BUTTON --------
-@app.on_callback_query()
-def buttons(client, query):
-
-    user_id = query.from_user.id
-
-    if not is_joined(client, user_id):
-        safe_edit(query.message, "🚫 Join Channel First")
-        return
-
-    if query.data == "manual":
-        user_steps[user_id] = "rename"
-        safe_edit(query.message, "✏ Send new name")
-
-    elif query.data == "auto":
-
-        file_msg = user_files[user_id]
-        name = file_msg.document.file_name
-        new_name = smart_name(os.path.splitext(name)[0])
-
-        pos = task_queue.qsize() + 1
-        task_queue.put((file_msg, new_name, query.message))
-
-        safe_edit(query.message, f"⏳ Added to Queue\n📍 Position: {pos}")
-
-# -------- TEXT --------
+# ================== TEXT ==================
 @app.on_message(filters.text & ~filters.command("start"))
 def rename_handler(_, message):
 
@@ -145,25 +167,28 @@ def rename_handler(_, message):
     if user_steps.get(user_id) != "rename":
         return
 
-    file_msg = user_files[user_id]
+    file_msg = user_files.get(user_id)
+    if not file_msg:
+        return
+
     new_name = message.text.strip()
 
     pos = task_queue.qsize() + 1
     task_queue.put((file_msg, new_name, message))
 
-    message.reply_text(f"⏳ Added to Queue\n📍 Position: {pos}")
+    message.reply_text(f"⏳ Added\n📍 Position: {pos}")
 
-# -------- WORKER --------
+# ================== WORKER ==================
 def worker():
     while True:
         file_msg, new_name, msg = task_queue.get()
         try:
             process_file(file_msg, new_name, msg)
         except Exception as e:
-            msg.reply_text(str(e))
+            msg.reply_text(f"❌ {e}")
         task_queue.task_done()
 
-# -------- PROCESS --------
+# ================== PROCESS ==================
 def process_file(file_msg, new_name, msg):
 
     progress_msg = msg.reply_text("⏳ Starting...", reply_markup=progress_btn())
@@ -179,7 +204,17 @@ def process_file(file_msg, new_name, msg):
             return
         last = p
 
-        safe_edit(progress_msg, f"📥 Downloading...\n\n[{progress_bar(p)}] {p}%")
+        speed = c / (time.time() - start + 1)
+        eta = (t - c) / (speed + 1)
+
+        safe_edit(
+            progress_msg,
+            f"📥 Downloading...\n\n"
+            f"[{progress_bar(p)}] {p}%\n"
+            f"⚡ {round(speed/1024/1024,2)} MB/s\n"
+            f"⏳ {int(eta)} sec",
+            progress_btn()
+        )
 
     file_path = file_msg.download(progress=progress)
 
@@ -187,13 +222,23 @@ def process_file(file_msg, new_name, msg):
     new_file = f"{new_name}{ext}"
     os.rename(file_path, new_file)
 
+    thumb = None
+    if file_msg.video and file_msg.video.thumbs:
+        thumb = file_msg.download(file_msg.video.thumbs[0].file_id)
+
     def up(c, t):
         p = int(c*100/t)
-        safe_edit(progress_msg, f"📤 Uploading...\n\n[{progress_bar(p)}] {p}%")
+
+        safe_edit(
+            progress_msg,
+            f"📤 Uploading...\n\n[{progress_bar(p)}] {p}%",
+            progress_btn()
+        )
 
     file_msg.reply_document(
         new_file,
         caption=f"✅ {new_name}",
+        thumb=thumb,
         progress=up
     )
 
@@ -203,8 +248,10 @@ def process_file(file_msg, new_name, msg):
         pass
 
     os.remove(new_file)
+    if thumb:
+        os.remove(thumb)
 
-# -------- RUN --------
+# ================== RUN ==================
 if __name__ == "__main__":
 
     threading.Thread(target=worker, daemon=True).start()
