@@ -31,11 +31,9 @@ def progress_bar(percent):
     left = 10 - done
     return "█" * done + "░" * left
 
-# -------- START MENU --------
-@app.on_message(filters.command("start"))
-def start(_, message):
-
-    btn = InlineKeyboardMarkup([
+# -------- MAIN MENU --------
+def main_menu():
+    return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📁 Rename", callback_data="menu_rename"),
             InlineKeyboardButton("⚙ Settings", callback_data="menu_settings")
@@ -46,30 +44,61 @@ def start(_, message):
         ]
     ])
 
+# -------- START --------
+@app.on_message(filters.command("start"))
+def start(_, message):
     message.reply_text(
-        "🔥 *AniToon PRO Bot*\n\nSelect an option below:",
-        reply_markup=btn
+        "🔥 *AniToon PRO Bot*\n\nSelect an option:",
+        reply_markup=main_menu()
     )
 
-# -------- MENU BUTTONS --------
+# -------- BUTTON HANDLER --------
 @app.on_callback_query()
 def buttons(_, query):
 
     data = query.data
     user_id = query.from_user.id
 
+    # -------- MENU --------
     if data == "menu_rename":
-        query.message.edit_text("📁 Send a file to rename")
+        query.message.edit_text(
+            "📁 Send a file to rename",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Back", callback_data="back")]
+            ])
+        )
 
     elif data == "menu_settings":
-        query.message.edit_text("⚙ Settings coming soon...")
+        query.message.edit_text(
+            "⚙ Settings (Coming Soon)",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Back", callback_data="back")]
+            ])
+        )
 
     elif data == "menu_status":
-        query.message.edit_text(f"📊 Queue Size: {task_queue.qsize()}")
+        query.message.edit_text(
+            f"📊 Queue Size: {task_queue.qsize()}",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Back", callback_data="back")]
+            ])
+        )
 
     elif data == "menu_help":
-        query.message.edit_text("❓ Send file → Rename → Done")
+        query.message.edit_text(
+            "❓ Send file → Rename → Done",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Back", callback_data="back")]
+            ])
+        )
 
+    elif data == "back":
+        query.message.edit_text(
+            "🔥 *AniToon PRO Bot*",
+            reply_markup=main_menu()
+        )
+
+    # -------- RENAME FLOW --------
     elif data == "manual":
         user_steps[user_id] = "rename"
         query.message.edit_text("✏ Send new name")
@@ -162,10 +191,12 @@ def process_file(file_msg, new_name, msg):
             progress_msg.edit_text(
                 f"📥 Downloading...\n\n"
                 f"[{progress_bar(percent)}] {percent}%\n\n"
-                f"⚡ Speed: {round(speed/1024/1024,2)} MB/s\n"
-                f"⏳ ETA: {int(eta)} sec",
+                f"⚡ {round(speed/1024/1024,2)} MB/s | ⏳ {int(eta)}s",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
+                    [
+                        InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33"),
+                        InlineKeyboardButton("❌ Cancel", callback_data="cancel")
+                    ]
                 ])
             )
         except:
@@ -196,10 +227,12 @@ def process_file(file_msg, new_name, msg):
             progress_msg.edit_text(
                 f"📤 Uploading...\n\n"
                 f"[{progress_bar(percent)}] {percent}%\n\n"
-                f"⚡ Speed: {round(speed/1024/1024,2)} MB/s\n"
-                f"⏳ ETA: {int(eta)} sec",
+                f"⚡ {round(speed/1024/1024,2)} MB/s | ⏳ {int(eta)}s",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
+                    [
+                        InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33"),
+                        InlineKeyboardButton("❌ Cancel", callback_data="cancel")
+                    ]
                 ])
             )
         except:
