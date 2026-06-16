@@ -29,20 +29,42 @@ task_queue = Queue()
 user_files = {}
 user_steps = {}
 
-# -------- SMART RENAME --------
+# -------- 🔥 ULTRA SMART RENAME (UPGRADED) --------
 def smart_name(name):
 
-    # Remove @words (like @channel, @abc123)
+    # Remove @words
     name = re.sub(r'@\w+', '', name)
 
-    # Remove dots, underscores, hyphens
-    name = re.sub(r'\.', ' ', name)
-    name = re.sub(r'[_\-]', ' ', name)
+    # Remove URLs
+    name = re.sub(r'www\.\S+', '', name)
+    name = re.sub(r'https?://\S+', '', name)
+
+    # Remove quality tags
+    name = re.sub(r'\b(480p|720p|1080p|2160p|4k)\b', '', name, flags=re.IGNORECASE)
+
+    # Remove video tags
+    name = re.sub(r'\b(HDRip|WEB-DL|WEBRip|BluRay|DVDRip|x264|x265|HEVC)\b', '', name, flags=re.IGNORECASE)
+
+    # Remove useless words (NEW 🔥)
+    name = re.sub(r'\b(full movie|official|trailer|download|watch online)\b', '', name, flags=re.IGNORECASE)
+
+    # Remove brackets
+    name = re.sub(r'\[.*?\]', '', name)
+    name = re.sub(r'\(.*?\)', '', name)
+
+    # Replace symbols
+    name = re.sub(r'[._\-]', ' ', name)
 
     # Remove extra spaces
     name = re.sub(r'\s+', ' ', name)
 
-    return name.strip().title()
+    name = name.strip()
+
+    # ⚠️ IMPORTANT FIX → avoid empty name
+    if not name:
+        name = "AniToon_File"
+
+    return name.title()
 
 # -------- PROGRESS BAR --------
 def progress_bar(percent):
@@ -50,7 +72,7 @@ def progress_bar(percent):
     left = 10 - done
     return "█" * done + "░" * left
 
-# -------- SAFE EDIT (FIX ERROR) --------
+# -------- SAFE EDIT --------
 def safe_edit(msg, text, reply_markup=None):
     try:
         msg.edit_text(text, reply_markup=reply_markup)
@@ -77,7 +99,7 @@ def start(_, message):
         reply_markup=btn
     )
 
-# -------- MENU BUTTONS --------
+# -------- BUTTONS --------
 @app.on_callback_query()
 def buttons(_, query):
 
@@ -101,6 +123,7 @@ def buttons(_, query):
         safe_edit(query.message, "✏ Send new name")
 
     elif data == "auto":
+
         if user_id not in user_files:
             safe_edit(query.message, "❌ Session expired")
             return
@@ -136,7 +159,7 @@ def file_handler(_, message):
         reply_markup=btn
     )
 
-# -------- TEXT HANDLER --------
+# -------- TEXT --------
 @app.on_message(filters.text & ~filters.command("start"))
 def rename_handler(_, message):
 
@@ -149,7 +172,12 @@ def rename_handler(_, message):
     if not file_msg:
         return
 
-    new_name = message.text
+    new_name = message.text.strip()
+
+    # ⚠️ prevent empty manual name
+    if not new_name:
+        message.reply_text("❌ Invalid name")
+        return
 
     task_queue.put((file_msg, new_name, message))
     message.reply_text("⏳ Added to queue...")
@@ -166,17 +194,16 @@ def worker():
 
         task_queue.task_done()
 
-# -------- PROCESS FILE --------
+# -------- PROCESS --------
 def process_file(file_msg, new_name, msg):
 
     user_id = file_msg.from_user.id
-
     progress_msg = msg.reply_text("⏳ Starting...")
 
     last_percent = {"down": -1, "up": -1}
     start_time = time.time()
 
-    # -------- DOWNLOAD --------
+    # DOWNLOAD
     def progress(current, total):
         percent = int(current * 100 / total)
 
@@ -198,12 +225,12 @@ def process_file(file_msg, new_name, msg):
 
     file_path = file_msg.download(progress=progress)
 
-    # -------- RENAME --------
+    # RENAME
     ext = os.path.splitext(file_path)[1]
     new_file = f"{new_name}{ext}"
     os.rename(file_path, new_file)
 
-    # -------- UPLOAD --------
+    # UPLOAD
     up_start = time.time()
 
     def up_progress(current, total):
