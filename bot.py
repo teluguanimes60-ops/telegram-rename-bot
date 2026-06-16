@@ -3,10 +3,14 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import *
 import os, re, time, threading
 from queue import Queue
-from pyrogram.errors import FloodWait
+from pyrogram.errors import FloodWait, UserNotParticipant
 from flask import Flask
 
-# -------- FLASK (RENDER FIX) --------
+# -------- SETTINGS --------
+CHANNEL = "Anitoon_edit"
+CHANNEL_POST = "https://t.me/Anitoon_edit/33"
+
+# -------- FLASK --------
 web_app = Flask(__name__)
 
 @web_app.route('/')
@@ -29,123 +33,74 @@ task_queue = Queue()
 user_files = {}
 user_steps = {}
 
-# -------- 🔥 ULTRA SMART RENAME (UPGRADED) --------
+# -------- FORCE JOIN --------
+def is_joined(client, user_id):
+    try:
+        client.get_chat_member(CHANNEL, user_id)
+        return True
+    except UserNotParticipant:
+        return False
+    except:
+        return True
+
+# -------- SMART RENAME --------
 def smart_name(name):
-
-    # Remove @words
     name = re.sub(r'@\w+', '', name)
-
-    # Remove URLs
-    name = re.sub(r'www\.\S+', '', name)
-    name = re.sub(r'https?://\S+', '', name)
-
-    # Remove quality tags
-    name = re.sub(r'\b(480p|720p|1080p|2160p|4k)\b', '', name, flags=re.IGNORECASE)
-
-    # Remove video tags
-    name = re.sub(r'\b(HDRip|WEB-DL|WEBRip|BluRay|DVDRip|x264|x265|HEVC)\b', '', name, flags=re.IGNORECASE)
-
-    # Remove useless words (NEW 🔥)
-    name = re.sub(r'\b(full movie|official|trailer|download|watch online)\b', '', name, flags=re.IGNORECASE)
-
-    # Remove brackets
-    name = re.sub(r'\[.*?\]', '', name)
-    name = re.sub(r'\(.*?\)', '', name)
-
-    # Replace symbols
+    name = re.sub(r'https?://\S+|www\.\S+', '', name)
+    name = re.sub(r'\b(480p|720p|1080p|4k|HDRip|WEBRip|BluRay|x264|x265)\b', '', name, flags=re.I)
+    name = re.sub(r'\[.*?\]|\(.*?\)', '', name)
     name = re.sub(r'[._\-]', ' ', name)
-
-    # Remove extra spaces
     name = re.sub(r'\s+', ' ', name)
 
     name = name.strip()
-
-    # ⚠️ IMPORTANT FIX → avoid empty name
     if not name:
         name = "AniToon_File"
 
     return name.title()
 
-# -------- PROGRESS BAR --------
-def progress_bar(percent):
-    done = int(percent / 10)
-    left = 10 - done
-    return "█" * done + "░" * left
+# -------- UI --------
+def progress_bar(p):
+    return "█" * int(p/10) + "░" * (10-int(p/10))
 
-# -------- SAFE EDIT --------
-def safe_edit(msg, text, reply_markup=None):
+def progress_btn():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📢 AniToon's Channel List", url=CHANNEL_POST)]
+    ])
+
+def safe_edit(msg, text):
     try:
-        msg.edit_text(text, reply_markup=reply_markup)
+        msg.edit_text(text, reply_markup=progress_btn())
     except:
         pass
 
-# -------- START MENU --------
+# -------- START --------
 @app.on_message(filters.command("start"))
-def start(_, message):
+def start(client, message):
 
-    btn = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("📁 Rename", callback_data="menu_rename"),
-            InlineKeyboardButton("⚙ Settings", callback_data="menu_settings")
-        ],
-        [
-            InlineKeyboardButton("📊 Status", callback_data="menu_status"),
-            InlineKeyboardButton("❓ Help", callback_data="menu_help")
-        ]
-    ])
+    if not is_joined(client, message.from_user.id):
+        message.reply_text(
+            "🚫 Join Channel First",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔔 Join Now", url=f"https://t.me/{CHANNEL}")]
+            ])
+        )
+        return
 
-    message.reply_text(
-        "🔥 *AniToon PRO Bot*\n\nSelect an option below:",
-        reply_markup=btn
-    )
+    message.reply_text("🔥 Send file to rename")
 
-# -------- BUTTONS --------
-@app.on_callback_query()
-def buttons(_, query):
-
-    data = query.data
-    user_id = query.from_user.id
-
-    if data == "menu_rename":
-        safe_edit(query.message, "📁 Send a file to rename")
-
-    elif data == "menu_settings":
-        safe_edit(query.message, "⚙ Settings coming soon...")
-
-    elif data == "menu_status":
-        safe_edit(query.message, f"📊 Queue Size: {task_queue.qsize()}")
-
-    elif data == "menu_help":
-        safe_edit(query.message, "❓ Send file → Rename → Done")
-
-    elif data == "manual":
-        user_steps[user_id] = "rename"
-        safe_edit(query.message, "✏ Send new name")
-
-    elif data == "auto":
-
-        if user_id not in user_files:
-            safe_edit(query.message, "❌ Session expired")
-            return
-
-        file_msg = user_files[user_id]
-        file_name = file_msg.document.file_name if file_msg.document else "file"
-        new_name = smart_name(os.path.splitext(file_name)[0])
-
-        task_queue.put((file_msg, new_name, query.message))
-        safe_edit(query.message, "⏳ Added to queue...")
-
-# -------- RECEIVE FILE --------
+# -------- FILE --------
 @app.on_message(filters.document | filters.video | filters.audio)
-def file_handler(_, message):
+def file_handler(client, message):
+
+    if not is_joined(client, message.from_user.id):
+        message.reply_text("🚫 Join Channel First")
+        return
 
     user_id = message.from_user.id
-
     user_files[user_id] = message
-    user_steps[user_id] = "choose"
 
-    file_name = message.document.file_name if message.document else "file"
-    suggested = smart_name(os.path.splitext(file_name)[0])
+    name = message.document.file_name
+    suggested = smart_name(os.path.splitext(name)[0])
 
     btn = InlineKeyboardMarkup([
         [
@@ -154,10 +109,32 @@ def file_handler(_, message):
         ]
     ])
 
-    message.reply_text(
-        f"📁 File Received!\n\n💡 Suggested:\n`{suggested}`",
-        reply_markup=btn
-    )
+    message.reply_text(f"💡 Suggested:\n`{suggested}`", reply_markup=btn)
+
+# -------- BUTTON --------
+@app.on_callback_query()
+def buttons(client, query):
+
+    user_id = query.from_user.id
+
+    if not is_joined(client, user_id):
+        safe_edit(query.message, "🚫 Join Channel First")
+        return
+
+    if query.data == "manual":
+        user_steps[user_id] = "rename"
+        safe_edit(query.message, "✏ Send new name")
+
+    elif query.data == "auto":
+
+        file_msg = user_files[user_id]
+        name = file_msg.document.file_name
+        new_name = smart_name(os.path.splitext(name)[0])
+
+        pos = task_queue.qsize() + 1
+        task_queue.put((file_msg, new_name, query.message))
+
+        safe_edit(query.message, f"⏳ Added to Queue\n📍 Position: {pos}")
 
 # -------- TEXT --------
 @app.on_message(filters.text & ~filters.command("start"))
@@ -168,94 +145,56 @@ def rename_handler(_, message):
     if user_steps.get(user_id) != "rename":
         return
 
-    file_msg = user_files.get(user_id)
-    if not file_msg:
-        return
-
+    file_msg = user_files[user_id]
     new_name = message.text.strip()
 
-    # ⚠️ prevent empty manual name
-    if not new_name:
-        message.reply_text("❌ Invalid name")
-        return
-
+    pos = task_queue.qsize() + 1
     task_queue.put((file_msg, new_name, message))
-    message.reply_text("⏳ Added to queue...")
+
+    message.reply_text(f"⏳ Added to Queue\n📍 Position: {pos}")
 
 # -------- WORKER --------
 def worker():
     while True:
         file_msg, new_name, msg = task_queue.get()
-
         try:
             process_file(file_msg, new_name, msg)
         except Exception as e:
-            msg.reply_text(f"❌ Error: {e}")
-
+            msg.reply_text(str(e))
         task_queue.task_done()
 
 # -------- PROCESS --------
 def process_file(file_msg, new_name, msg):
 
-    user_id = file_msg.from_user.id
-    progress_msg = msg.reply_text("⏳ Starting...")
+    progress_msg = msg.reply_text("⏳ Starting...", reply_markup=progress_btn())
 
-    last_percent = {"down": -1, "up": -1}
-    start_time = time.time()
+    last = -1
+    start = time.time()
 
-    # DOWNLOAD
-    def progress(current, total):
-        percent = int(current * 100 / total)
+    def progress(c, t):
+        nonlocal last
+        p = int(c*100/t)
 
-        if percent == last_percent["down"]:
+        if p == last:
             return
+        last = p
 
-        last_percent["down"] = percent
-
-        speed = current / (time.time() - start_time + 1)
-        eta = (total - current) / (speed + 1)
-
-        safe_edit(
-            progress_msg,
-            f"📥 Downloading...\n\n"
-            f"[{progress_bar(percent)}] {percent}%\n\n"
-            f"⚡ {round(speed/1024/1024,2)} MB/s\n"
-            f"⏳ {int(eta)} sec"
-        )
+        safe_edit(progress_msg, f"📥 Downloading...\n\n[{progress_bar(p)}] {p}%")
 
     file_path = file_msg.download(progress=progress)
 
-    # RENAME
     ext = os.path.splitext(file_path)[1]
     new_file = f"{new_name}{ext}"
     os.rename(file_path, new_file)
 
-    # UPLOAD
-    up_start = time.time()
-
-    def up_progress(current, total):
-        percent = int(current * 100 / total)
-
-        if percent == last_percent["up"]:
-            return
-
-        last_percent["up"] = percent
-
-        speed = current / (time.time() - up_start + 1)
-        eta = (total - current) / (speed + 1)
-
-        safe_edit(
-            progress_msg,
-            f"📤 Uploading...\n\n"
-            f"[{progress_bar(percent)}] {percent}%\n\n"
-            f"⚡ {round(speed/1024/1024,2)} MB/s\n"
-            f"⏳ {int(eta)} sec"
-        )
+    def up(c, t):
+        p = int(c*100/t)
+        safe_edit(progress_msg, f"📤 Uploading...\n\n[{progress_bar(p)}] {p}%")
 
     file_msg.reply_document(
         new_file,
-        caption=f"✅ Renamed: {new_name}",
-        progress=up_progress
+        caption=f"✅ {new_name}",
+        progress=up
     )
 
     try:
@@ -264,9 +203,6 @@ def process_file(file_msg, new_name, msg):
         pass
 
     os.remove(new_file)
-
-    user_files.pop(user_id, None)
-    user_steps.pop(user_id, None)
 
 # -------- RUN --------
 if __name__ == "__main__":
@@ -279,5 +215,4 @@ if __name__ == "__main__":
             print("🚀 Bot Starting...")
             app.run()
         except FloodWait as e:
-            print(f"FloodWait: {e.value}")
             time.sleep(e.value)
