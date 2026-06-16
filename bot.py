@@ -2,12 +2,11 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import *
 from flask import Flask
-import threading, os, time
-
+import threading, os
 from queue import Queue
 
+# -------- QUEUE --------
 task_queue = Queue()
-processing = False
 
 # -------- FLASK --------
 web_app = Flask(__name__)
@@ -27,55 +26,31 @@ app = Client(
     bot_token=BOT_TOKEN
 )
 
-user_files = {}
-
 # -------- START --------
 @app.on_message(filters.command("start"))
 def start(_, message):
-    message.reply_text(
-        "🔥 PRO Rename Bot\n\nSend a file to begin."
-    )
+    message.reply_text("🔥 PRO Rename Bot\n\nSend a file")
 
-# -------- RECEIVE FILE --------
-
-    @app.on_message(filters.document | filters.video | filters.audio)
+# -------- FILE RECEIVE --------
+@app.on_message(filters.document | filters.video | filters.audio)
 def file_handler(_, message):
 
     task_queue.put(message)
 
     message.reply_text(
-        "📥 Added to queue!\n⏳ Wait for processing..."
+        "📥 Added to queue!\n⏳ Wait..."
     )
-    
-    user_files[message.from_user.id] = message
 
-    btn = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✏ Rename", callback_data="rename")]
-    ])
-
-    message.reply_text("📁 File received", reply_markup=btn)
-
-# -------- BUTTON --------
-@app.on_callback_query()
-def cb(_, query):
-
-    if query.data == "rename":
-        query.message.edit_text("✏ Send new name")
-
-# -------- RENAME --------
-@app.on_message(filters.text & ~filters.command("start"))
-def rename(_, message):
+# -------- PROCESS FUNCTION --------
+def process_file(message):
 
     user_id = message.from_user.id
 
-    if user_id not in user_files:
-        return
+    ask = message.reply_text("✏ Send new file name")
+    new_msg = app.listen(user_id)
+    new_name = new_msg.text
 
-    file_msg = user_files[user_id]
-    new_name = message.text
-
-    # Progress message
-    progress_msg = message.reply_text("⏳ Processing... 0%")
+    progress_msg = message.reply_text("⏳ Starting...")
 
     # Download
     def progress(current, total):
@@ -87,14 +62,14 @@ def rename(_, message):
             ])
         )
 
-    file_path = file_msg.download(progress=progress)
+    file_path = message.download(progress=progress)
 
     # Rename
     ext = os.path.splitext(file_path)[1]
     new_file = f"{new_name}{ext}"
     os.rename(file_path, new_file)
 
-    # Upload progress
+    # Upload
     def up_progress(current, total):
         percent = int(current * 100 / total)
         progress_msg.edit_text(
@@ -104,48 +79,12 @@ def rename(_, message):
             ])
         )
 
-    message.reply_document(
-        new_file,
-        progress=up_progress
-    )
-
-    progress_msg.delete()
-
-    os.remove(new_file)
-    user_files.pop(user_id)
-
-# -------- RUN --------
-def process_file(message):
-
-    user_id = message.from_user.id
-
-    msg = message.reply_text("✏ Send new name")
-
-    new_msg = app.listen(user_id)
-    new_name = new_msg.text
-
-    progress_msg = message.reply_text("⏳ Starting...")
-
-    def progress(current, total):
-        percent = int(current * 100 / total)
-        progress_msg.edit_text(f"📥 Downloading...\n\n{percent}%")
-
-    file_path = message.download(progress=progress)
-
-    ext = os.path.splitext(file_path)[1]
-    new_file = f"{new_name}{ext}"
-    os.rename(file_path, new_file)
-
-    def up_progress(current, total):
-        percent = int(current * 100 / total)
-        progress_msg.edit_text(f"📤 Uploading...\n\n{percent}%")
-
     message.reply_document(new_file, progress=up_progress)
 
     progress_msg.delete()
     os.remove(new_file)
 
-
+# -------- WORKER --------
 def worker():
     while True:
         message = task_queue.get()
@@ -156,7 +95,8 @@ def worker():
             message.reply_text(f"❌ Error: {e}")
 
         task_queue.task_done()
-        
+
+# -------- RUN --------
 if __name__ == "__main__":
     threading.Thread(target=worker, daemon=True).start()
     threading.Thread(target=run_web).start()
