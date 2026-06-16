@@ -10,7 +10,7 @@ app = Client(
     bot_token=BOT_TOKEN
 )
 
-# Store user states
+# Store user states safely
 user_state = {}
 
 # ---------------- START ----------------
@@ -50,12 +50,16 @@ def callback(_, query: CallbackQuery):
 
     user_id = query.from_user.id
 
+    # IMPORTANT: stop loading animation
+    query.answer()
+
     if query.data == "cancel":
         user_state.pop(user_id, None)
         query.message.edit_text("❌ Cancelled")
         return
 
     if query.data == "rename":
+
         if user_id not in user_state:
             query.message.edit_text("❌ No file found")
             return
@@ -78,27 +82,31 @@ def rename_handler(_, message: Message):
     if user_state[user_id]["step"] != "rename":
         return
 
-    new_name = message.text
-    file_msg = user_state[user_id]["file"]
+    try:
+        new_name = message.text.strip()
+        file_msg = user_state[user_id]["file"]
 
-    # Download file
-    file_path = file_msg.download()
+        # Download file
+        file_path = file_msg.download()
 
-    # Get extension
-    ext = os.path.splitext(file_path)[1]
+        # Get extension
+        ext = os.path.splitext(file_path)[1]
 
-    new_file_path = f"{new_name}{ext}"
+        new_file_path = f"{new_name}{ext}"
 
-    os.rename(file_path, new_file_path)
+        os.rename(file_path, new_file_path)
 
-    # Send renamed file
-    message.reply_document(
-        document=new_file_path,
-        caption="✅ Renamed Successfully!"
-    )
+        # Send renamed file
+        message.reply_document(
+            document=new_file_path,
+            caption="✅ Renamed Successfully!"
+        )
 
-    # Cleanup
-    os.remove(new_file_path)
-    user_state.pop(user_id, None)
+        # Cleanup
+        os.remove(new_file_path)
+        user_state.pop(user_id, None)
+
+    except Exception as e:
+        message.reply_text(f"❌ Error: {e}")
 
 app.run()
