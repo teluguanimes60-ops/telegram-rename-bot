@@ -3,10 +3,6 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import *
 from flask import Flask
 import threading, os, re, time
-from collections import deque
-
-# -------- QUEUE --------
-queue = deque()
 
 # -------- FLASK --------
 web_app = Flask(__name__)
@@ -36,23 +32,45 @@ def smart_rename(filename):
     name = re.sub(r"(www\..*?\.)", "", name)
     name = re.sub(r"[_\-\.]+", " ", name)
     name = " ".join(name.split())
-    return name + ext
+    return name
 
 # -------- START --------
 @app.on_message(filters.command("start"))
 def start(_, message):
     message.reply_text(
-        "🔥 **AniToon Pro Bot**\n\n"
-        "📁 Send file to start\n"
-        "⚡ Fast • Smart • Pro"
+        "🔥 **AniToon Pro Bot**\n\nSend file to start"
     )
 
-# -------- FILE RECEIVE --------
+# -------- SINGLE FILE HANDLER (FIXED) --------
 @app.on_message(filters.document | filters.video | filters.audio)
 def file_handler(_, message):
 
     user_id = message.from_user.id
 
+    # -------- INFO MODE --------
+    if user_steps.get(user_id) == "waiting_info":
+
+        msg = message.reply_text("🔍 Analyzing...")
+
+        file = message.document or message.video or message.audio
+
+        name = file.file_name if file.file_name else "Unknown"
+        size = round(file.file_size / (1024 * 1024), 2)
+
+        text = f"📊 **File Info**\n\n📁 {name}\n📦 {size} MB\n"
+
+        if message.video:
+            text += f"⏱ Duration: {message.video.duration} sec\n"
+
+        if message.audio:
+            text += f"🎵 Duration: {message.audio.duration} sec\n"
+
+        msg.edit_text(text)
+
+        user_steps.pop(user_id, None)
+        return
+
+    # -------- NORMAL FLOW --------
     user_files[user_id] = message
     user_steps[user_id] = "waiting_button"
 
@@ -66,51 +84,44 @@ def file_handler(_, message):
         ]
     ])
 
-    message.reply_text(
-        "📁 File received!\nChoose option:",
-        reply_markup=btn
-    )
+    message.reply_text("📁 File received!", reply_markup=btn)
 
-# -------- BUTTON HANDLER --------
+# -------- BUTTON --------
 @app.on_callback_query()
 def cb(_, query):
 
     user_id = query.from_user.id
 
     if user_id not in user_files:
-        query.answer("❌ Session expired", show_alert=True)
+        query.answer("❌ Expired", show_alert=True)
         return
+
+    file_msg = user_files[user_id]
+    file = file_msg.document or file_msg.video or file_msg.audio
 
     if query.data == "manual":
         user_steps[user_id] = "waiting_name"
-        query.message.edit_text("✏ Send new file name")
+        query.message.edit_text("✏ Send new name")
 
     elif query.data == "smart":
-        file_msg = user_files[user_id]
-
-        file = file_msg.document or file_msg.video or file_msg.audio
         old_name = file.file_name if file.file_name else "file"
-
         new_name = smart_rename(old_name)
 
-        query.message.edit_text(f"✨ Smart Name:\n\n`{new_name}`")
+        query.message.edit_text(f"✨ Smart Name:\n`{new_name}`")
 
         process_file(query.message, file_msg, new_name, user_id)
 
     elif query.data == "info":
         user_steps[user_id] = "waiting_info"
-        query.message.edit_text("📊 Send file again to get info")
+        query.message.edit_text("📊 Send file again for info")
 
-# -------- TEXT RENAME --------
+# -------- TEXT --------
 @app.on_message(filters.text & ~filters.command("start"))
-def rename_handler(_, message):
+def rename(_, message):
 
     user_id = message.from_user.id
 
     if user_steps.get(user_id) != "waiting_name":
-        return
-
-    if user_id not in user_files:
         return
 
     file_msg = user_files[user_id]
@@ -118,109 +129,32 @@ def rename_handler(_, message):
 
     process_file(message, file_msg, new_name, user_id)
 
-# -------- PROCESS FILE --------
+# -------- PROCESS --------
 def process_file(message, file_msg, new_name, user_id):
 
-    start_time = time.time()
-    progress_msg = message.reply_text("⏳ Starting...")
+    start = time.time()
+    msg = message.reply_text("⏳ Starting...")
 
-    # DOWNLOAD
-    def progress(current, total):
-        now = time.time()
-        diff = now - start_time
-
-        if diff == 0:
-            return
-
-        speed = current / diff
-        percent = current * 100 / total
-        remaining = (total - current) / speed if speed > 0 else 0
-
-        progress_msg.edit_text(
-            f"📥 **Downloading**\n\n"
-            f"🔄 {percent:.1f}%\n"
-            f"⚡ {speed/1024/1024:.2f} MB/s\n"
-            f"⌛ {int(remaining)} sec left",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
-            ])
-        )
+    def progress(c, t):
+        percent = int(c * 100 / t)
+        msg.edit_text(f"📥 Downloading {percent}%")
 
     file_path = file_msg.download(progress=progress)
 
-    # RENAME
     ext = os.path.splitext(file_path)[1]
-    new_file = f"{new_name}{ext}"
+    new_file = new_name + ext
     os.rename(file_path, new_file)
 
-    upload_start = time.time()
+    def up(c, t):
+        percent = int(c * 100 / t)
+        msg.edit_text(f"📤 Uploading {percent}%")
 
-    # UPLOAD
-    def up_progress(current, total):
-        now = time.time()
-        diff = now - upload_start
+    message.reply_document(new_file, progress=up)
 
-        if diff == 0:
-            return
-
-        speed = current / diff
-        percent = current * 100 / total
-        remaining = (total - current) / speed if speed > 0 else 0
-
-        progress_msg.edit_text(
-            f"📤 **Uploading**\n\n"
-            f"🚀 {percent:.1f}%\n"
-            f"⚡ {speed/1024/1024:.2f} MB/s\n"
-            f"⌛ {int(remaining)} sec left",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
-            ])
-        )
-
-    message.reply_document(
-        new_file,
-        caption="✅ Done!",
-        progress=up_progress
-    )
-
-    progress_msg.delete()
+    msg.delete()
     os.remove(new_file)
 
     user_files.pop(user_id, None)
-    user_steps.pop(user_id, None)
-
-# -------- INFO SYSTEM --------
-@app.on_message(filters.document | filters.video | filters.audio)
-def info_handler(_, message):
-
-    user_id = message.from_user.id
-
-    if user_steps.get(user_id) != "waiting_info":
-        return
-
-    msg = message.reply_text("🔍 Analyzing...")
-
-    file = message.document or message.video or message.audio
-
-    name = file.file_name if file.file_name else "Unknown"
-    size = round(file.file_size / (1024 * 1024), 2)
-
-    text = (
-        f"📊 **File Info**\n\n"
-        f"📁 Name: `{name}`\n"
-        f"📦 Size: {size} MB\n"
-    )
-
-    if message.video:
-        text += f"⏱ Duration: {message.video.duration} sec\n"
-
-    if message.audio:
-        text += f"🎵 Duration: {message.audio.duration} sec\n"
-
-    text += "\n⚠️ Languages & subtitles coming next..."
-
-    msg.edit_text(text)
-
     user_steps.pop(user_id, None)
 
 # -------- RUN --------
