@@ -1,3 +1,4 @@
+print("BOT STARTING...")
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import *
@@ -174,4 +175,5 @@ def process_file(file_msg, new_name, msg):
 # -------- RUN --------
 if __name__ == "__main__":
     threading.Thread(target=run_web).start()
+    print("BOT RUNNING...")
     app.run()
