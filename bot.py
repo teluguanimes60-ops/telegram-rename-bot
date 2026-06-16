@@ -25,12 +25,62 @@ def smart_name(name):
     name = re.sub(r'\s+', ' ', name)
     return name.strip().title()
 
-# -------- START --------
+# -------- PROGRESS BAR --------
+def progress_bar(percent):
+    done = int(percent / 10)
+    left = 10 - done
+    return "█" * done + "░" * left
+
+# -------- START MENU --------
 @app.on_message(filters.command("start"))
 def start(_, message):
+
+    btn = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📁 Rename", callback_data="menu_rename"),
+            InlineKeyboardButton("⚙ Settings", callback_data="menu_settings")
+        ],
+        [
+            InlineKeyboardButton("📊 Status", callback_data="menu_status"),
+            InlineKeyboardButton("❓ Help", callback_data="menu_help")
+        ]
+    ])
+
     message.reply_text(
-        "🔥 PRO Rename Bot\n\n📁 Send file to start"
+        "🔥 *AniToon PRO Bot*\n\nSelect an option below:",
+        reply_markup=btn
     )
+
+# -------- MENU BUTTONS --------
+@app.on_callback_query()
+def buttons(_, query):
+
+    data = query.data
+    user_id = query.from_user.id
+
+    if data == "menu_rename":
+        query.message.edit_text("📁 Send a file to rename")
+
+    elif data == "menu_settings":
+        query.message.edit_text("⚙ Settings coming soon...")
+
+    elif data == "menu_status":
+        query.message.edit_text(f"📊 Queue Size: {task_queue.qsize()}")
+
+    elif data == "menu_help":
+        query.message.edit_text("❓ Send file → Rename → Done")
+
+    elif data == "manual":
+        user_steps[user_id] = "rename"
+        query.message.edit_text("✏ Send new name")
+
+    elif data == "auto":
+        file_msg = user_files[user_id]
+        file_name = file_msg.document.file_name if file_msg.document else "file"
+        new_name = smart_name(os.path.splitext(file_name)[0])
+
+        task_queue.put((file_msg, new_name, query.message))
+        query.message.edit_text("⏳ Added to queue...")
 
 # -------- RECEIVE FILE --------
 @app.on_message(filters.document | filters.video | filters.audio)
@@ -56,33 +106,7 @@ def file_handler(_, message):
         reply_markup=btn
     )
 
-# -------- BUTTON --------
-@app.on_callback_query()
-def buttons(_, query):
-
-    user_id = query.from_user.id
-
-    if user_id not in user_files:
-        try:
-            query.message.edit_text("❌ Session expired")
-        except:
-            pass
-        return
-
-    if query.data == "manual":
-        user_steps[user_id] = "rename"
-        query.message.edit_text("✏ Send new name")
-
-    elif query.data == "auto":
-        file_msg = user_files[user_id]
-
-        file_name = file_msg.document.file_name if file_msg.document else "file"
-        new_name = smart_name(os.path.splitext(file_name)[0])
-
-        task_queue.put((file_msg, new_name, query.message))
-        query.message.edit_text("⏳ Added to queue...")
-
-# -------- TEXT --------
+# -------- TEXT HANDLER --------
 @app.on_message(filters.text & ~filters.command("start"))
 def rename_handler(_, message):
 
@@ -112,7 +136,7 @@ def worker():
 
         task_queue.task_done()
 
-# -------- PROCESS --------
+# -------- PROCESS FILE --------
 def process_file(file_msg, new_name, msg):
 
     user_id = file_msg.from_user.id
@@ -120,6 +144,7 @@ def process_file(file_msg, new_name, msg):
     progress_msg = msg.reply_text("⏳ Starting...")
 
     last_percent = {"down": -1, "up": -1}
+    start_time = time.time()
 
     # -------- DOWNLOAD --------
     def progress(current, total):
@@ -130,9 +155,15 @@ def process_file(file_msg, new_name, msg):
 
         last_percent["down"] = percent
 
+        speed = current / (time.time() - start_time + 1)
+        eta = (total - current) / (speed + 1)
+
         try:
             progress_msg.edit_text(
-                f"📥 Downloading...\n\n🔄 {percent}%",
+                f"📥 Downloading...\n\n"
+                f"[{progress_bar(percent)}] {percent}%\n\n"
+                f"⚡ Speed: {round(speed/1024/1024,2)} MB/s\n"
+                f"⏳ ETA: {int(eta)} sec",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
                 ])
@@ -148,6 +179,8 @@ def process_file(file_msg, new_name, msg):
     os.rename(file_path, new_file)
 
     # -------- UPLOAD --------
+    up_start = time.time()
+
     def up_progress(current, total):
         percent = int(current * 100 / total)
 
@@ -156,9 +189,15 @@ def process_file(file_msg, new_name, msg):
 
         last_percent["up"] = percent
 
+        speed = current / (time.time() - up_start + 1)
+        eta = (total - current) / (speed + 1)
+
         try:
             progress_msg.edit_text(
-                f"📤 Uploading...\n\n🚀 {percent}%",
+                f"📤 Uploading...\n\n"
+                f"[{progress_bar(percent)}] {percent}%\n\n"
+                f"⚡ Speed: {round(speed/1024/1024,2)} MB/s\n"
+                f"⏳ ETA: {int(eta)} sec",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("🔔 Join Channel", url="https://t.me/Anitoon_edit/33")]
                 ])
