@@ -4,6 +4,11 @@ from config import *
 from flask import Flask
 import threading, os, time
 
+from queue import Queue
+
+task_queue = Queue()
+processing = False
+
 # -------- FLASK --------
 web_app = Flask(__name__)
 
@@ -32,9 +37,16 @@ def start(_, message):
     )
 
 # -------- RECEIVE FILE --------
-@app.on_message(filters.document | filters.video | filters.audio)
+
+    @app.on_message(filters.document | filters.video | filters.audio)
 def file_handler(_, message):
 
+    task_queue.put(message)
+
+    message.reply_text(
+        "📥 Added to queue!\n⏳ Wait for processing..."
+    )
+    
     user_files[message.from_user.id] = message
 
     btn = InlineKeyboardMarkup([
