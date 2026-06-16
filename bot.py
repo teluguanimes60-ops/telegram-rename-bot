@@ -156,6 +156,8 @@ def worker():
             message.reply_text(f"❌ Error: {e}")
 
         task_queue.task_done()
+        
 if __name__ == "__main__":
+    threading.Thread(target=worker, daemon=True).start()
     threading.Thread(target=run_web).start()
     app.run()
