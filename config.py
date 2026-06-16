@@ -1,4 +1,6 @@
-API_ID = "33341376"
-API_HASH = "3e225fe3d916d2e2df1c8887e31e713d"
-BOT_TOKEN = "8732705270:AAGjfcMZyggreDaNa8irOnpTpmzvN-9ZBuI"
-MONGO_URL = "mongodb+srv://teluguanimes60_db_user:MonkeyDLuffy@cluster0.qm6qxq3.mongodb.net/?appName=Cluster0"
+import os
+
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+MONGO_URL = os.getenv("MONGO_URL")
