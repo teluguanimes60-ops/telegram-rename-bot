@@ -2,6 +2,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from config import *
 import os
+import time
 
 app = Client(
     "bot",
@@ -10,16 +11,29 @@ app = Client(
     bot_token=BOT_TOKEN
 )
 
-# Store user states safely
 user_state = {}
 
 # ---------------- START ----------------
 @app.on_message(filters.command("start"))
 def start(_, message):
     message.reply_text(
-        "🤖 PRO Rename Bot Ready!\n\n"
-        "📁 Send a file to start."
+        "🤖 PRO File Bot Ready!\n\n"
+        "📁 Send file to start."
     )
+
+# ---------------- FILE INFO FUNCTION ----------------
+def get_file_info(message: Message):
+    file = message.document or message.video or message.audio
+
+    size = file.file_size / (1024 * 1024)
+    name = file.file_name if hasattr(file, "file_name") else "media file"
+
+    return f"""
+📄 File Info:
+
+📌 Name: {name}
+📦 Size: {size:.2f} MB
+"""
 
 # ---------------- FILE RECEIVER ----------------
 @app.on_message(filters.document | filters.video | filters.audio)
@@ -32,45 +46,48 @@ def get_file(_, message: Message):
         "step": "choose"
     }
 
+    info = get_file_info(message)
+
     buttons = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✏ Rename", callback_data="rename"),
-            InlineKeyboardButton("❌ Cancel", callback_data="cancel")
-        ]
+        [InlineKeyboardButton("✏ Rename", callback_data="rename")],
+        [InlineKeyboardButton("📊 Info", callback_data="info")],
+        [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
     ])
 
-    message.reply_text(
-        "📁 File received!\n\nChoose option:",
-        reply_markup=buttons
-    )
+    message.reply_text(info, reply_markup=buttons)
 
-# ---------------- BUTTON HANDLER ----------------
+# ---------------- CALLBACK ----------------
 @app.on_callback_query()
 def callback(_, query: CallbackQuery):
 
     user_id = query.from_user.id
-
-    # IMPORTANT: stop loading animation
     query.answer()
+
+    if user_id not in user_state:
+        query.message.edit_text("❌ Session expired")
+        return
 
     if query.data == "cancel":
         user_state.pop(user_id, None)
         query.message.edit_text("❌ Cancelled")
         return
 
+    if query.data == "info":
+        message = user_state[user_id]["file"]
+        query.message.edit_text(get_file_info(message))
+        return
+
     if query.data == "rename":
-
-        if user_id not in user_state:
-            query.message.edit_text("❌ No file found")
-            return
-
         user_state[user_id]["step"] = "rename"
+        query.message.edit_text("✏ Send new file name:")
+        return
 
-        query.message.edit_text(
-            "✏ Send new file name (without extension)"
-        )
+# ---------------- PROGRESS SIMULATION ----------------
+def fake_progress(text, percent):
+    bar = "█" * (percent // 10) + "░" * (10 - percent // 10)
+    return f"{text}\n\n[{bar}] {percent}%"
 
-# ---------------- TEXT HANDLER ----------------
+# ---------------- RENAME HANDLER ----------------
 @app.on_message(filters.text & ~filters.command("start"))
 def rename_handler(_, message: Message):
 
@@ -86,23 +103,41 @@ def rename_handler(_, message: Message):
         new_name = message.text.strip()
         file_msg = user_state[user_id]["file"]
 
-        # Download file
-        file_path = file_msg.download()
+        msg = message.reply_text("⬇ Downloading... 0%")
 
-        # Get extension
+        # DOWNLOAD WITH PROGRESS
+        def progress(current, total):
+            percent = int((current / total) * 100)
+            try:
+                msg.edit_text(fake_progress("⬇ Downloading...", percent))
+            except:
+                pass
+
+        file_path = file_msg.download(progress=progress)
+
+        msg.edit_text("✏ Renaming file...")
+
         ext = os.path.splitext(file_path)[1]
-
         new_file_path = f"{new_name}{ext}"
 
         os.rename(file_path, new_file_path)
 
-        # Send renamed file
+        msg.edit_text("⬆ Uploading... 0%")
+
+        # UPLOAD WITH PROGRESS
+        def upload_progress(current, total):
+            percent = int((current / total) * 100)
+            try:
+                msg.edit_text(fake_progress("⬆ Uploading...", percent))
+            except:
+                pass
+
         message.reply_document(
             document=new_file_path,
-            caption="✅ Renamed Successfully!"
+            caption="✅ Renamed Successfully!",
+            progress=upload_progress
         )
 
-        # Cleanup
         os.remove(new_file_path)
         user_state.pop(user_id, None)
 
