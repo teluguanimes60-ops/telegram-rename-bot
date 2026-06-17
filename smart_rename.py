@@ -1,47 +1,44 @@
 import re
 
-# ===== QUALITY DETECTOR =====
 def detect_quality(name):
-    match = re.search(r'\b(144p|240p|360p|480p|720p|1080p|1440p|2160p|4k)\b', name, re.I)
+    match = re.search(r'(144p|240p|360p|480p|720p|1080p|2160p|4k)', name, re.I)
     return match.group(0).upper() if match else ""
 
-# ===== ULTRA CLEAN =====
+def detect_episode(name):
+    match = re.search(r'(S\d+E\d+)', name, re.I)
+    return match.group(0).upper() if match else ""
+
 def ultra_clean(name):
 
-    # REMOVE @tags
     name = re.sub(r'@\w+', '', name)
-
-    # REMOVE LINKS
     name = re.sub(r'https?://\S+|www\.\S+', '', name)
-
-    # REMOVE BRACKETS
     name = re.sub(r'\[.*?\]|\(.*?\)', '', name)
+    name = re.sub(r'\b(x264|x265|HEVC|AAC|HDRip|WEBRip|BluRay)\b', '', name, flags=re.I)
 
-    # REMOVE CODECS
-    name = re.sub(r'\b(x264|x265|HEVC|AAC|HDRip|WEBRip|BluRay|DVDRip)\b', '', name, flags=re.I)
-
-    # REMOVE LAST JUNK WORD
     words = name.split()
-    if len(words) > 3:
-        words.pop()  # remove last waste word
+    if len(words) > 4:
+        words.pop()
+
     name = " ".join(words)
 
-    # CLEAN SYMBOLS
     name = re.sub(r'[._\-]', ' ', name)
     name = re.sub(r'\s+', ' ', name)
 
     return name.strip()
 
-# ===== FINAL SMART NAME =====
 def smart_rename(name):
 
     quality = detect_quality(name)
+    episode = detect_episode(name)
 
-    cleaned = ultra_clean(name)
+    clean = ultra_clean(name)
+
+    final = clean
+
+    if episode:
+        final += f" {episode}"
 
     if quality:
-        final = f"{cleaned} [{quality}]"
-    else:
-        final = cleaned
+        final += f" [{quality}]"
 
     return final.title() if final else "AniToon_File"
