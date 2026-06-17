@@ -8,6 +8,7 @@ from flask import Flask
 
 # ===== SETTINGS =====
 CHANNEL = "Anitoon_edit"
+CHANNEL_LINK = "https://t.me/Anitoon_edit"
 CHANNEL_POST = "https://t.me/Anitoon_edit/33"
 
 # ===== FLASK =====
@@ -63,7 +64,12 @@ def safe_edit(msg, text, btn=None):
     except:
         pass
 
-# ===== MAIN MENU =====
+def force_join():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔔 AniToon's Channel", url=CHANNEL_LINK)]
+    ])
+
+# ===== MENUS =====
 def main_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📁 Rename", callback_data="menu_rename")],
@@ -73,11 +79,10 @@ def main_menu():
         [InlineKeyboardButton("❓ Help", callback_data="menu_help")]
     ])
 
-# ===== VIDEO MENU =====
 def video_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎞 Convert", callback_data="video_convert")],
-        [InlineKeyboardButton("🖼 Thumbnail Info", callback_data="video_thumb")],
+        [InlineKeyboardButton("🎞 File → Video", callback_data="video_file_to_video")],
+        [InlineKeyboardButton("📂 Video → File", callback_data="video_video_to_file")],
         [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
     ])
 
@@ -87,14 +92,12 @@ def start(client, message):
 
     if not is_joined(client, message.from_user.id):
         message.reply_text(
-            "🚫 Join Channel First",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔔 Join Now", url=f"https://t.me/{CHANNEL}")]
-            ])
+            "🚫 You must subscribe the channel to continue",
+            reply_markup=force_join()
         )
         return
 
-    message.reply_text("🔥 *AniToon PRO Bot*\n\nSelect option:", reply_markup=main_menu())
+    message.reply_text("🔥 AniToon PRO Bot\n\nSelect option:", reply_markup=main_menu())
 
 # ===== BUTTONS =====
 @app.on_callback_query()
@@ -104,15 +107,14 @@ def buttons(client, query):
     data = query.data
 
     if not is_joined(client, user_id):
-        safe_edit(query.message, "🚫 Join Channel First")
+        safe_edit(query.message, "🚫 Join channel to continue", force_join())
         return
 
-    # MAIN MENU NAVIGATION
     if data == "back_main":
         safe_edit(query.message, "🏠 Main Menu", main_menu())
 
     elif data == "menu_rename":
-        safe_edit(query.message, "📁 Send a file to rename")
+        safe_edit(query.message, "📁 Send file to rename")
 
     elif data == "menu_video":
         safe_edit(query.message, "🎬 Video Tools", video_menu())
@@ -124,16 +126,8 @@ def buttons(client, query):
         safe_edit(query.message, f"📊 Queue: {task_queue.qsize()}")
 
     elif data == "menu_help":
-        safe_edit(query.message, "Send file → choose rename → done")
+        safe_edit(query.message, "Send file → rename → done")
 
-    # VIDEO FEATURES
-    elif data == "video_convert":
-        safe_edit(query.message, "🎞 Convert feature coming soon")
-
-    elif data == "video_thumb":
-        safe_edit(query.message, "🖼 Thumbnail auto used in uploads")
-
-    # RENAME
     elif data == "manual":
         user_steps[user_id] = "rename"
         safe_edit(query.message, "✏ Send new name")
@@ -158,7 +152,7 @@ def buttons(client, query):
 def file_handler(client, message):
 
     if not is_joined(client, message.from_user.id):
-        message.reply_text("🚫 Join Channel First")
+        message.reply_text("🚫 Join channel first", reply_markup=force_join())
         return
 
     user_id = message.from_user.id
@@ -212,14 +206,14 @@ def process_file(file_msg, new_name, msg):
 
     progress_msg = msg.reply_text("⏳ Starting...", reply_markup=progress_btn())
 
-    last = -1
+    last = -5   # update every 5%
     start = time.time()
 
     def progress(c, t):
         nonlocal last
         p = int(c*100/t)
 
-        if p == last:
+        if p - last < 5:   # 🔥 smooth + less spam = faster
             return
         last = p
 
