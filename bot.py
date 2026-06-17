@@ -1,26 +1,25 @@
-# ===== ULTIMATE GOD++ TELEGRAM BOT (UPDATED) =====
+# ===== GOD++++ FINAL TELEGRAM BOT =====
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import FloodWait
+from pyrogram.errors import FloodWait, UserNotParticipant
 from config import *
 import os, re, time, threading, json
 from queue import Queue
 from flask import Flask
 
 # ===== SETTINGS =====
-WORKERS = 3
 CHANNEL_POST = "https://t.me/Anitoon_edit/33"
+WORKERS = 3
 
-# ===== FILE SYSTEM =====
-if not os.path.exists("thumbs"):
-    os.mkdir("thumbs")
+# ===== FOLDERS =====
+os.makedirs("thumbs", exist_ok=True)
 
+# ===== DATABASE =====
 DB_FILE = "db.json"
 if not os.path.exists(DB_FILE):
     json.dump({}, open(DB_FILE, "w"))
 
-# ===== DATABASE =====
 def load_db():
     return json.load(open(DB_FILE))
 
@@ -56,23 +55,36 @@ user_files = {}
 user_steps = {}
 active_tasks = 0
 
-# ===== SMART RENAME (KEEP S/E/QUALITY) =====
+# ===== SMART RENAME (FINAL) =====
 def smart_name(name):
 
-    # remove @ tags only
+    # remove @tags
     name = re.sub(r'@\w+', '', name)
+
+    # keep season & episode
+    season = re.findall(r'(S\d{1,2}|Season ?\d+)', name, re.I)
+    episode = re.findall(r'(E\d{1,3}|Ep ?\d+)', name, re.I)
+
+    # keep quality
+    quality = re.findall(r'(480p|720p|1080p|4k)', name, re.I)
 
     # remove brackets
     name = re.sub(r'\[.*?\]|\(.*?\)', '', name)
 
-    # KEEP season/episode/quality
-    # only clean symbols
+    # clean symbols
     name = re.sub(r'[._\-]', ' ', name)
 
     # remove extra spaces
     name = re.sub(r'\s+', ' ', name)
 
-    return name.strip().title() or "AniToon_File"
+    base = name.strip().title()
+
+    # rebuild important parts
+    extra = " ".join(season + episode + quality)
+
+    final = f"{base} {extra}".strip()
+
+    return final if final else "AniToon_File"
 
 # ===== UI =====
 def bar(p):
@@ -93,98 +105,81 @@ def safe_edit(msg, text, btn=None):
 def main_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📁 Rename", callback_data="rename")],
-        [InlineKeyboardButton("🎬 Video Settings", callback_data="video_settings")],
-        [InlineKeyboardButton("🖼 Thumbnail", callback_data="thumb_menu")],
-        [InlineKeyboardButton("⚙ Settings", callback_data="settings")],
-        [InlineKeyboardButton("📊 Status", callback_data="status")]
+        [InlineKeyboardButton("🎬 Video Tools", callback_data="video")],
+        [InlineKeyboardButton("📊 Status", callback_data="status")],
+        [InlineKeyboardButton("⚙ Settings", callback_data="settings")]
     ])
 
 def rename_menu(uid):
-    user = get_user(uid)
-    saved = user.get("saved_name")
+    saved = get_user(uid).get("saved_name")
 
     buttons = [
-        [
-            InlineKeyboardButton("⚡ Auto", callback_data="auto"),
-            InlineKeyboardButton("✏ Manual", callback_data="manual")
-        ]
+        [InlineKeyboardButton("⚡ Auto", callback_data="auto")],
+        [InlineKeyboardButton("✏ Manual", callback_data="manual")]
     ]
 
     if saved:
         buttons.append([InlineKeyboardButton("📌 Use Saved Name", callback_data="saved")])
     else:
-        buttons.append([InlineKeyboardButton("➕ Save Name", callback_data="add_saved")])
+        buttons.append([InlineKeyboardButton("➕ Add Saved Name", callback_data="add_saved")])
 
     return InlineKeyboardMarkup(buttons)
 
 def settings_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ Save Rename Name", callback_data="add_saved")],
-        [InlineKeyboardButton("✏ Change Saved Name", callback_data="change_saved")],
-        [InlineKeyboardButton("🖼 Thumbnail Settings", callback_data="thumb_settings")]
-    ])
-
-def thumb_menu(uid):
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ Add Thumbnail", callback_data="add_thumb")],
-        [InlineKeyboardButton("🔁 Change Thumbnail", callback_data="add_thumb")],
-        [InlineKeyboardButton("⚙ Thumbnail Mode", callback_data="thumb_settings")]
+        [InlineKeyboardButton("📌 Set Saved Name", callback_data="setname")],
+        [InlineKeyboardButton("🖼 Set Thumbnail", callback_data="thumb")],
+        [InlineKeyboardButton("🔙 Back", callback_data="back")]
     ])
 
 def video_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🎞 File → Video", callback_data="f2v")],
         [InlineKeyboardButton("📂 Video → File", callback_data="v2f")],
+        [InlineKeyboardButton("📊 Media Info", callback_data="info")],
         [InlineKeyboardButton("🔙 Back", callback_data="back")]
     ])
 
 # ===== START =====
 @app.on_message(filters.command("start"))
-def start(_, msg):
-    msg.reply_text("🔥 ULTIMATE BOT\n\nChoose option:", reply_markup=main_menu())
+def start(client, msg):
+    msg.reply_text("🔥 AniToon GOD++++ BOT", reply_markup=main_menu())
 
 # ===== BUTTONS =====
 @app.on_callback_query()
-def buttons(_, q):
+def buttons(client, q):
 
     uid = q.from_user.id
     data = q.data
 
     if data == "rename":
-        safe_edit(q.message, "📁 Send file to rename")
+        safe_edit(q.message, "📁 Send file", rename_menu(uid))
 
-    elif data == "video_settings":
-        safe_edit(q.message, "🎬 Choose conversion type", video_menu())
-
-    elif data == "thumb_menu":
-        safe_edit(q.message, "🖼 Thumbnail options", thumb_menu(uid))
+    elif data == "video":
+        safe_edit(q.message, "🎬 Video Tools", video_menu())
 
     elif data == "settings":
-        safe_edit(q.message, "⚙ Settings Panel", settings_menu())
+        safe_edit(q.message, "⚙ Settings", settings_menu())
 
     elif data == "status":
         safe_edit(q.message, f"📊 Queue: {task_queue.qsize()}\n⚡ Active: {active_tasks}")
 
+    elif data == "back":
+        safe_edit(q.message, "🏠 Menu", main_menu())
+
     elif data == "manual":
         user_steps[uid] = "rename"
-        safe_edit(q.message, "✏ Send custom name")
+        safe_edit(q.message, "✏ Send new name")
 
-    elif data == "add_saved":
-        user_steps[uid] = "save_name"
-        safe_edit(q.message, "➕ Send name to save")
-
-    elif data == "change_saved":
-        user_steps[uid] = "save_name"
-        safe_edit(q.message, "✏ Send new saved name")
+    elif data == "setname":
+        user_steps[uid] = "setname"
+        safe_edit(q.message, "📌 Send name to save")
 
     elif data == "saved":
         file = user_files.get(uid)
-        saved = get_user(uid).get("saved_name")
-
-        if not file or not saved:
-            safe_edit(q.message, "❌ No saved name")
+        if not file:
             return
-
+        saved = get_user(uid).get("saved_name")
         task_queue.put((file, saved, q.message))
         safe_edit(q.message, "⏳ Using saved name...")
 
@@ -192,20 +187,14 @@ def buttons(_, q):
         file = user_files.get(uid)
         if not file:
             return
-
         name = file.document.file_name if file.document else "file"
         new = smart_name(os.path.splitext(name)[0])
-
         task_queue.put((file, new, q.message))
-        safe_edit(q.message, "⏳ Auto rename started")
-
-    elif data == "add_thumb":
-        user_steps[uid] = "thumb"
-        safe_edit(q.message, "🖼 Send thumbnail image")
+        safe_edit(q.message, "⏳ Auto rename started...")
 
 # ===== FILE =====
 @app.on_message(filters.document | filters.video | filters.audio)
-def file_handler(_, msg):
+def file_handler(client, msg):
 
     uid = msg.from_user.id
     user_files[uid] = msg
@@ -213,42 +202,30 @@ def file_handler(_, msg):
     name = msg.document.file_name if msg.document else "file"
     sug = smart_name(os.path.splitext(name)[0])
 
-    msg.reply_text(
-        f"💡 Suggested:\n`{sug}`",
-        reply_markup=rename_menu(uid)
-    )
+    msg.reply_text(f"💡 Suggested:\n`{sug}`", reply_markup=rename_menu(uid))
 
 # ===== TEXT =====
 @app.on_message(filters.text & ~filters.command("start"))
-def text_handler(_, msg):
+def text_handler(client, msg):
 
     uid = msg.from_user.id
 
     if user_steps.get(uid) == "rename":
         file = user_files.get(uid)
-        if not file:
-            return
-
         task_queue.put((file, msg.text.strip(), msg))
-        msg.reply_text("⏳ Added")
+        msg.reply_text("⏳ Added to queue")
 
-    elif user_steps.get(uid) == "save_name":
+    elif user_steps.get(uid) == "setname":
         set_user(uid, "saved_name", msg.text.strip())
-        user_steps.pop(uid)
-        msg.reply_text("✅ Name saved")
+        msg.reply_text("✅ Saved name updated")
 
 # ===== THUMB =====
 @app.on_message(filters.photo)
-def save_thumb(_, msg):
+def thumb(client, msg):
 
     uid = msg.from_user.id
-    if user_steps.get(uid) != "thumb":
-        return
-
     path = msg.download(f"thumbs/{uid}.jpg")
     set_user(uid, "thumb", path)
-
-    user_steps.pop(uid)
     msg.reply_text("✅ Thumbnail saved")
 
 # ===== WORKER =====
@@ -329,7 +306,7 @@ if __name__ == "__main__":
 
     while True:
         try:
-            print("🚀 BOT STARTED")
+            print("🚀 GOD++++ BOT START")
             app.run()
         except FloodWait as e:
             time.sleep(e.value)
