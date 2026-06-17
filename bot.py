@@ -1,4 +1,4 @@
-# ===== ULTIMATE FINAL TELEGRAM BOT (AniToon GOD MAX FIXED) =====
+# ===== AniToon FINAL GOD MAX BOT (FULL FIXED) =====
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -9,7 +9,7 @@ from queue import Queue
 from flask import Flask
 
 # ===== SETTINGS =====
-CHANNEL = "Anitoon_edit"
+CHANNEL_ID = anitoon_edit
 CHANNEL_LINK = "https://t.me/Anitoon_edit"
 CHANNEL_POST = "https://t.me/Anitoon_edit/33"
 WORKERS = 4
@@ -58,41 +58,36 @@ user_files = {}
 user_steps = {}
 active_tasks = 0
 
-# ===== JOIN CHECK (FIXED) =====
+# ===== JOIN CHECK (REAL FIX) =====
 def is_joined(client, uid):
     try:
-        member = client.get_chat_member(CHANNEL, uid)
+        member = client.get_chat_member(CHANNEL_ID, uid)
         return member.status in ["member", "administrator", "creator"]
-    except UserNotParticipant:
-        return False
     except:
         return False
 
-# ===== SMART RENAME (FIXED PRO) =====
+# ===== SMART RENAME (ULTRA FIXED) =====
 def smart_name(name):
 
-    # remove @words
-    name = re.sub(r'@\w+', '', name)
+    # remove @tags fully
+    name = re.sub(r'\[?@\w+\]?', '', name)
 
-    # remove brackets like [@abc] fully
-    name = re.sub(r'\[.*?\]', '', name)
+    # remove [] ()
+    name = re.sub(r'\[.*?\]|\(.*?\)', '', name)
 
-    # remove () content
-    name = re.sub(r'\(.*?\)', '', name)
-
-    # remove urls
+    # remove links
     name = re.sub(r'https?://\S+|www\.\S+', '', name)
 
-    # KEEP QUALITY (important)
+    # fix weird numbers (.824747)
+    name = re.sub(r'\.\d+', '', name)
+
     # clean symbols
     name = re.sub(r'[._\-]', ' ', name)
 
     # remove extra spaces
-    name = re.sub(r'\s+', ' ', name)
+    name = re.sub(r'\s+', ' ', name).strip()
 
-    name = name.strip()
-
-    # remove useless last word (garbage)
+    # remove last garbage word
     words = name.split()
     if len(words) > 3:
         words = words[:-1]
@@ -101,22 +96,21 @@ def smart_name(name):
 
     return name.title() if name else "AniToon_File"
 
-# ===== PROGRESS BAR (PRO LOOK) =====
+# ===== PROGRESS UI =====
 def progress_bar(p):
-    filled = int(p / 5)
-    return "▰" * filled + "▱" * (20 - filled)
+    return "▰" * int(p/5) + "▱" * (20-int(p/5))
 
-def format_time(seconds):
-    return f"{int(seconds//60)}m {int(seconds%60)}s"
+def format_time(sec):
+    return f"{int(sec//60)}m {int(sec%60)}s"
 
 def progress_btn():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 AniToon's Channel List", url=CHANNEL_POST)]
+        [InlineKeyboardButton("📢 Join Channel", url=CHANNEL_POST)]
     ])
 
 def join_btn():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔔 AniToon's Channel", url=CHANNEL_LINK)]
+        [InlineKeyboardButton("🔔 Join Channel", url=CHANNEL_LINK)]
     ])
 
 def safe_edit(msg, text, btn=None):
@@ -125,16 +119,13 @@ def safe_edit(msg, text, btn=None):
     except:
         pass
 
-# ===== MENUS =====
+# ===== MENU =====
 def main_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📁 Rename", callback_data="rename"),
-         InlineKeyboardButton("🎬 Video", callback_data="video")],
-        [InlineKeyboardButton("🎵 Audio", callback_data="audio"),
-         InlineKeyboardButton("📦 Files", callback_data="files")],
-        [InlineKeyboardButton("🖼 Thumbnail", callback_data="thumb"),
          InlineKeyboardButton("ℹ Info", callback_data="info")],
-        [InlineKeyboardButton("📊 Status", callback_data="status")]
+        [InlineKeyboardButton("🖼 Thumbnail", callback_data="thumb"),
+         InlineKeyboardButton("📊 Status", callback_data="status")]
     ])
 
 # ===== START =====
@@ -143,49 +134,38 @@ def start(client, msg):
 
     if not is_joined(client, msg.from_user.id):
         msg.reply_text(
-            "🚫 **You must subscribe the channel to continue**",
+            "🚫 You must join channel to use bot",
             reply_markup=join_btn()
         )
         return
 
-    msg.reply_text(
-        "🔥 *AniToon Ultimate Bot*\n\nSelect Option:",
-        reply_markup=main_menu()
-    )
+    msg.reply_text("🔥 AniToon FINAL BOT", reply_markup=main_menu())
 
 # ===== BUTTONS =====
 @app.on_callback_query()
 def buttons(client, q):
 
     uid = q.from_user.id
-    data = q.data
 
     if not is_joined(client, uid):
-        safe_edit(
-            q.message,
-            "🚫 You must subscribe to continue",
-            join_btn()
-        )
+        safe_edit(q.message, "🚫 Join channel first", join_btn())
         return
 
-    if data == "rename":
-        safe_edit(q.message, "📁 Send file to rename")
+    if q.data == "rename":
+        safe_edit(q.message, "📁 Send file")
 
-    elif data == "thumb":
+    elif q.data == "thumb":
         user_steps[uid] = "thumb"
-        safe_edit(q.message, "🖼 Send thumbnail image")
+        safe_edit(q.message, "🖼 Send thumbnail")
 
-    elif data == "info":
+    elif q.data == "info":
         user_steps[uid] = "info"
-        safe_edit(q.message, "📥 Send file to get full info")
+        safe_edit(q.message, "📥 Send file for info")
 
-    elif data == "status":
-        safe_edit(
-            q.message,
-            f"📊 Queue: {task_queue.qsize()}\n⚡ Active: {active_tasks}"
-        )
+    elif q.data == "status":
+        safe_edit(q.message, f"📊 Queue: {task_queue.qsize()} | Active: {active_tasks}")
 
-    elif data == "auto":
+    elif q.data == "auto":
         file = user_files.get(uid)
         if not file:
             return
@@ -196,17 +176,14 @@ def buttons(client, q):
         pos = task_queue.qsize() + 1
         task_queue.put((file, new, q.message))
 
-        safe_edit(q.message, f"⏳ Added to Queue\n📍 Position: {pos}")
+        safe_edit(q.message, f"⏳ Added to Queue\n📍 {pos}")
 
-# ===== FILE HANDLER =====
+# ===== FILE =====
 @app.on_message(filters.document | filters.video | filters.audio)
 def file_handler(client, msg):
 
     if not is_joined(client, msg.from_user.id):
-        msg.reply_text(
-            "🚫 Join channel first",
-            reply_markup=join_btn()
-        )
+        msg.reply_text("🚫 Join first", reply_markup=join_btn())
         return
 
     uid = msg.from_user.id
@@ -215,12 +192,9 @@ def file_handler(client, msg):
     if user_steps.get(uid) == "info":
         size = round((msg.document.file_size if msg.document else 0)/1024/1024,2)
 
-        msg.reply_text(f"""
-📂 **File Info**
-📛 Name: {msg.document.file_name if msg.document else "Media"}
-📦 Size: {size} MB
-🎬 Type: {msg.media}
-        """)
+        msg.reply_text(
+            f"📂 Name: {msg.document.file_name}\n📦 Size: {size} MB\n🎬 Type: {msg.media}"
+        )
         user_steps.pop(uid)
         return
 
@@ -238,7 +212,7 @@ def file_handler(client, msg):
 
 # ===== THUMB =====
 @app.on_message(filters.photo)
-def save_thumb(client, msg):
+def thumb(client, msg):
 
     uid = msg.from_user.id
 
@@ -273,49 +247,30 @@ def process(file, name, msg):
     uid = file.from_user.id
     thumb = get_user(uid).get("thumb")
 
-    start_time = time.time()
-
-    pmsg = msg.reply_text("⏳ Initializing...", reply_markup=progress_btn())
+    start = time.time()
+    pmsg = msg.reply_text("⏳ Starting...", reply_markup=progress_btn())
 
     def progress(c, t):
-        percent = int(c * 100 / t)
-        speed = c / (time.time() - start_time + 1)
+        p = int(c*100/t)
+        speed = c / (time.time() - start + 1)
         eta = (t - c) / (speed + 1)
 
         safe_edit(
             pmsg,
-            f"""
-📥 **Downloading**
-
-{progress_bar(percent)} {percent}%
-
-⚡ Speed: {round(speed/1024/1024,2)} MB/s
-⏳ ETA: {format_time(eta)}
-            """,
+            f"📥 Downloading\n{progress_bar(p)} {p}%\n⚡ {round(speed/1024/1024,2)} MB/s\n⏳ {format_time(eta)}",
             progress_btn()
         )
 
-    path = file.download(
-        file_name=f"downloads/{time.time()}",
-        progress=progress
-    )
+    path = file.download(file_name=f"downloads/{time.time()}", progress=progress)
 
-    ext = os.path.splitext(path)[1]
+    ext = os.path.splitext(file.file_name)[1] if file.document else ".mkv"
     new_file = f"{name}{ext}"
+
     os.rename(path, new_file)
 
     def upload(c, t):
-        percent = int(c * 100 / t)
-
-        safe_edit(
-            pmsg,
-            f"""
-📤 **Uploading**
-
-{progress_bar(percent)} {percent}%
-            """,
-            progress_btn()
-        )
+        p = int(c*100/t)
+        safe_edit(pmsg, f"📤 Uploading\n{progress_bar(p)} {p}%", progress_btn())
 
     file.reply_document(
         new_file,
@@ -341,7 +296,7 @@ if __name__ == "__main__":
 
     while True:
         try:
-            print("🚀 AniToon Ultimate Bot Started")
+            print("🚀 BOT STARTED")
             app.run()
         except FloodWait as e:
             time.sleep(e.value)
