@@ -1,8 +1,8 @@
-# ===== GOD++++ FINAL TELEGRAM BOT =====
+# ===== GOD+++++ FINAL ULTIMATE TELEGRAM BOT =====
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import FloodWait, UserNotParticipant
+from pyrogram.errors import FloodWait
 from config import *
 import os, re, time, threading, json
 from queue import Queue
@@ -10,7 +10,7 @@ from flask import Flask
 
 # ===== SETTINGS =====
 CHANNEL_POST = "https://t.me/Anitoon_edit/33"
-WORKERS = 3
+WORKERS = 4   # increased workers for speed
 
 # ===== FOLDERS =====
 os.makedirs("thumbs", exist_ok=True)
@@ -55,31 +55,21 @@ user_files = {}
 user_steps = {}
 active_tasks = 0
 
-# ===== SMART RENAME (FINAL) =====
+# ===== SMART RENAME =====
 def smart_name(name):
 
-    # remove @tags
     name = re.sub(r'@\w+', '', name)
 
-    # keep season & episode
     season = re.findall(r'(S\d{1,2}|Season ?\d+)', name, re.I)
     episode = re.findall(r'(E\d{1,3}|Ep ?\d+)', name, re.I)
+    quality = re.findall(r'(480p|720p|1080p|2160p|4k)', name, re.I)
 
-    # keep quality
-    quality = re.findall(r'(480p|720p|1080p|4k)', name, re.I)
-
-    # remove brackets
     name = re.sub(r'\[.*?\]|\(.*?\)', '', name)
-
-    # clean symbols
     name = re.sub(r'[._\-]', ' ', name)
-
-    # remove extra spaces
     name = re.sub(r'\s+', ' ', name)
 
     base = name.strip().title()
 
-    # rebuild important parts
     extra = " ".join(season + episode + quality)
 
     final = f"{base} {extra}".strip()
@@ -113,22 +103,23 @@ def main_menu():
 def rename_menu(uid):
     saved = get_user(uid).get("saved_name")
 
-    buttons = [
-        [InlineKeyboardButton("⚡ Auto", callback_data="auto")],
-        [InlineKeyboardButton("✏ Manual", callback_data="manual")]
+    btns = [
+        [InlineKeyboardButton("⚡ Auto Rename", callback_data="auto")],
+        [InlineKeyboardButton("✏ Manual Rename", callback_data="manual")]
     ]
 
     if saved:
-        buttons.append([InlineKeyboardButton("📌 Use Saved Name", callback_data="saved")])
+        btns.append([InlineKeyboardButton("📌 Use Saved Name", callback_data="saved")])
     else:
-        buttons.append([InlineKeyboardButton("➕ Add Saved Name", callback_data="add_saved")])
+        btns.append([InlineKeyboardButton("➕ Add Saved Name", callback_data="add_saved")])
 
-    return InlineKeyboardMarkup(buttons)
+    return InlineKeyboardMarkup(btns)
 
-def settings_menu():
+def settings_menu(uid):
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📌 Set Saved Name", callback_data="setname")],
         [InlineKeyboardButton("🖼 Set Thumbnail", callback_data="thumb")],
+        [InlineKeyboardButton("🗑 Remove Thumbnail", callback_data="delthumb")],
         [InlineKeyboardButton("🔙 Back", callback_data="back")]
     ])
 
@@ -143,7 +134,7 @@ def video_menu():
 # ===== START =====
 @app.on_message(filters.command("start"))
 def start(client, msg):
-    msg.reply_text("🔥 AniToon GOD++++ BOT", reply_markup=main_menu())
+    msg.reply_text("🔥 AniToon GOD+++++ BOT\n\nUltimate Features Enabled 🚀", reply_markup=main_menu())
 
 # ===== BUTTONS =====
 @app.on_callback_query()
@@ -153,19 +144,19 @@ def buttons(client, q):
     data = q.data
 
     if data == "rename":
-        safe_edit(q.message, "📁 Send file", rename_menu(uid))
+        safe_edit(q.message, "📁 Send file to rename", rename_menu(uid))
 
     elif data == "video":
         safe_edit(q.message, "🎬 Video Tools", video_menu())
 
     elif data == "settings":
-        safe_edit(q.message, "⚙ Settings", settings_menu())
+        safe_edit(q.message, "⚙ Settings Panel", settings_menu(uid))
 
     elif data == "status":
         safe_edit(q.message, f"📊 Queue: {task_queue.qsize()}\n⚡ Active: {active_tasks}")
 
     elif data == "back":
-        safe_edit(q.message, "🏠 Menu", main_menu())
+        safe_edit(q.message, "🏠 Main Menu", main_menu())
 
     elif data == "manual":
         user_steps[uid] = "rename"
@@ -190,7 +181,15 @@ def buttons(client, q):
         name = file.document.file_name if file.document else "file"
         new = smart_name(os.path.splitext(name)[0])
         task_queue.put((file, new, q.message))
-        safe_edit(q.message, "⏳ Auto rename started...")
+        safe_edit(q.message, "⚡ Auto Rename Started")
+
+    elif data == "delthumb":
+        set_user(uid, "thumb", None)
+        safe_edit(q.message, "🗑 Thumbnail removed")
+
+    elif data == "info":
+        user_steps[uid] = "info"
+        safe_edit(q.message, "📊 Send file to get info")
 
 # ===== FILE =====
 @app.on_message(filters.document | filters.video | filters.audio)
@@ -280,7 +279,11 @@ def process(file, name, msg):
 
     def upload(c, t):
         p = int(c*100/t)
-        safe_edit(pmsg, f"📤 Uploading...\n\n[{bar(p)}] {p}%", progress_btn())
+        safe_edit(
+            pmsg,
+            f"📤 Uploading...\n\n[{bar(p)}] {p}%",
+            progress_btn()
+        )
 
     file.reply_document(
         new_file,
@@ -306,7 +309,7 @@ if __name__ == "__main__":
 
     while True:
         try:
-            print("🚀 GOD++++ BOT START")
+            print("🚀 GOD+++++ BOT START")
             app.run()
         except FloodWait as e:
             time.sleep(e.value)
