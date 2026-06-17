@@ -9,7 +9,7 @@ from queue import Queue
 from flask import Flask
 
 # ===== SETTINGS =====
-CHANNEL_ID = anitoon_edit
+CHANNEL_ID = "anitoon_edit"
 CHANNEL_LINK = "https://t.me/Anitoon_edit"
 CHANNEL_POST = "https://t.me/Anitoon_edit/33"
 WORKERS = 4
