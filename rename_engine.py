@@ -1,31 +1,16 @@
-import re
-
 def smart_name(name: str):
 
-    # ===== REMOVE @tags =====
     name = re.sub(r'@\w+', '', name)
 
-    # ===== REMOVE URLs =====
-    name = re.sub(r'https?://\S+|www\.\S+', '', name)
+    season = re.findall(r'(S\d{1,2}|Season ?\d+)', name, re.I)
+    episode = re.findall(r'(E\d{1,3}|Ep ?\d+)', name, re.I)
+    quality = re.findall(r'(480p|720p|1080p|2160p|4k)', name, re.I)
 
-    # ===== KEEP QUALITY (IMPORTANT FEATURE) =====
-    # (DO NOT REMOVE 720p, 1080p, 4K etc)
-
-    # ===== REMOVE BRACKETS =====
-    name = re.sub(r'\[.*?\]', '', name)
-    name = re.sub(r'\(.*?\)', '', name)
-
-    # ===== CLEAN SYMBOLS =====
+    name = re.sub(r'\[.*?\]|\(.*?\)', '', name)
     name = re.sub(r'[._\-]', ' ', name)
-
-    # ===== REMOVE EXTRA SPACES =====
     name = re.sub(r'\s+', ' ', name).strip()
 
-    # ===== REMOVE LAST WASTE WORD =====
-    parts = name.split(" ")
-    if len(parts) > 2:
-        parts = parts[:-1]  # remove last word
+    base = name.title()
+    extra = " ".join(season + episode + quality)
 
-    final = " ".join(parts)
-
-    return final.title() if final else "AniToon_File"
+    return f"{base} {extra}".strip()
