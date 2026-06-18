@@ -1,5 +1,5 @@
 # ===== AniToons Rename Bot (GOD MODE ULTRA SYSTEM - FINAL FIXED) =====
-
+from flask import Flask
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
@@ -9,6 +9,17 @@ from queue import Queue
 
 # ===== SETTINGS =====
 WORKERS = 12
+
+# ===== WEB SERVER (RENDER FIX) =====
+web = Flask(__name__)
+
+@web.route("/")
+def home():
+    return "Bot Running ✅"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    web.run(host="0.0.0.0", port=port)
 
 # ===== FOLDERS =====
 BASE = os.getcwd()
@@ -243,9 +254,12 @@ if __name__ == "__main__":
     for _ in range(WORKERS):
         threading.Thread(target=worker, daemon=True).start()
 
+    # 🔥 REQUIRED FOR RENDER
+    threading.Thread(target=run_web, daemon=True).start()
+
     while True:
         try:
-            print("🚀 Bot Running...")
+            print("🚀 GOD MODE RUNNING")
             app.run()
         except FloodWait as e:
             time.sleep(e.value)
