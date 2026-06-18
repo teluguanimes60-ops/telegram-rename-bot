@@ -1,4 +1,4 @@
-# ===== AniToons Rename Bot (GOD MODE ULTRA SYSTEM) =====
+# ===== AniToons Rename Bot (GOD MODE ULTRA SYSTEM - FINAL FIXED) =====
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -8,7 +8,7 @@ import os, re, time, threading, subprocess
 from queue import Queue
 
 # ===== SETTINGS =====
-WORKERS = 10
+WORKERS = 12
 
 # ===== FOLDERS =====
 BASE = os.getcwd()
@@ -44,18 +44,18 @@ def smart_name(name):
     return name.strip().title() or "File"
 
 # ===== UI =====
-def menu():
+def main_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📁 Rename", callback_data="rename")],
         [InlineKeyboardButton("🎬 Convert", callback_data="convert")],
         [InlineKeyboardButton("📸 Screenshots", callback_data="ss")],
-        [InlineKeyboardButton("⚙ Save Name", callback_data="setname")]
+        [InlineKeyboardButton("⚙ Saved Name", callback_data="setname")]
     ])
 
 # ===== START =====
 @app.on_message(filters.command("start"))
 def start(_, m):
-    m.reply_text("🚀 GOD MODE BOT READY", reply_markup=menu())
+    m.reply_text("🚀 Bot Ready\n\nChoose option below:", reply_markup=main_menu())
 
 # ===== BUTTONS =====
 @app.on_callback_query()
@@ -68,7 +68,7 @@ def cb(_, q):
     if data == "rename":
         user_mode[uid] = "rename"
         user_files[uid] = []
-        q.message.reply_text("📁 Send files")
+        q.message.reply_text("📁 Send files to rename")
 
     elif data == "convert":
         user_mode[uid] = "convert"
@@ -76,11 +76,11 @@ def cb(_, q):
 
     elif data == "ss":
         user_mode[uid] = "ss"
-        q.message.reply_text("🎬 Send video")
+        q.message.reply_text("📸 Send video")
 
     elif data == "setname":
         user_mode[uid] = "setname"
-        q.message.reply_text("📌 Send name")
+        q.message.reply_text("📌 Send name to save")
 
 # ===== FILE HANDLER =====
 @app.on_message(filters.document | filters.video | filters.audio)
@@ -89,10 +89,9 @@ def file_handler(_, m):
     uid = m.from_user.id
     mode = user_mode.get(uid)
 
-    user_files.setdefault(uid, []).append(m)
-
     if mode == "rename":
-        m.reply_text("✏ Send name OR wait for auto")
+        user_files.setdefault(uid, []).append(m)
+        m.reply_text("✅ File added\nSend name OR wait for auto rename")
 
     elif mode == "convert":
         task_queue.put((m, "convert", uid))
@@ -109,7 +108,7 @@ def text(_, m):
 
     if mode == "setname":
         saved_name[uid] = m.text
-        m.reply_text("✅ Saved")
+        m.reply_text("✅ Saved for all files")
 
     elif mode == "rename":
         for f in user_files.get(uid, []):
@@ -130,9 +129,9 @@ def worker():
 
         try:
             process(file, name, uid)
-        except Exception as e:
+        except:
             try:
-                file.reply_text("❌ Error occurred")
+                file.reply_text("❌ Failed")
             except:
                 pass
 
@@ -142,22 +141,20 @@ def worker():
 # ===== PROCESS =====
 def process(file, name, uid):
 
-    qpos = task_queue.qsize()
-    msg = file.reply_text(f"⏳ Queue: {qpos}")
-
+    msg = file.reply_text("⏳ Starting...")
     start = time.time()
 
     # ===== DOWNLOAD =====
     def dprog(c, t):
-        p = int(c*100/t)
-        speed = c/(time.time()-start+1)
-        eta = (t-c)/(speed+1)
+        p = int(c * 100 / t)
+        speed = c / (time.time() - start + 1)
+        eta = (t - c) / (speed + 1)
 
         msg.edit_text(
             f"⬇ Downloading\n"
-            f"{p}%\n"
-            f"⚡ {round(speed/1024/1024,2)} MB/s\n"
-            f"⏱ ETA: {int(eta)}s"
+            f"Progress: {p}%\n"
+            f"Speed: {round(speed/1024/1024,2)} MB/s\n"
+            f"ETA: {int(eta)} sec"
         )
 
     path = file.download(file_name=f"{DOWNLOAD}/{time.time()}", progress=dprog)
@@ -173,27 +170,31 @@ def process(file, name, uid):
     if name == "convert":
         if path.endswith(".mp4"):
             out = f"{OUTPUT}/{time.time()}.mkv"
-            subprocess.run(["ffmpeg","-i",path,"-c","copy",out])
+            subprocess.run(["ffmpeg", "-y", "-i", path, "-c", "copy", out])
         else:
             out = f"{OUTPUT}/{time.time()}.mp4"
-            subprocess.run(["ffmpeg","-i",path,out])
+            subprocess.run(["ffmpeg", "-y", "-i", path, out])
         path = out
 
     # ===== SCREENSHOTS =====
     elif name == "ss":
-        for i in range(1,6):
+        for i in range(1, 6):
             img = f"{SCREEN}/{time.time()}_{i}.jpg"
             subprocess.run([
-                "ffmpeg","-i",path,
+                "ffmpeg","-y","-i",path,
                 "-ss",str(i*2),
                 "-vframes","1",img
             ])
             file.reply_photo(img)
         return
 
-    # ===== THUMB =====
+    # ===== AUTO THUMB =====
     thumb = f"{THUMB}/{time.time()}.jpg"
-    subprocess.run(["ffmpeg","-i",path,"-ss","3","-vframes","1",thumb])
+    subprocess.run([
+        "ffmpeg","-y","-i",path,
+        "-ss","3",
+        "-vframes","1",thumb
+    ])
 
     # ===== RENAME =====
     ext = os.path.splitext(path)[1]
@@ -202,12 +203,19 @@ def process(file, name, uid):
 
     msg.edit_text("⬆ Uploading...")
 
-    # ===== UPLOAD PROGRESS =====
-    def uprog(c, t):
-        p = int(c*100/t)
-        msg.edit_text(f"⬆ Uploading\n{p}%")
+    # ===== UPLOAD =====
+    up_start = time.time()
 
-    # ===== SEND FIXED =====
+    def uprog(c, t):
+        p = int(c * 100 / t)
+        speed = c / (time.time() - up_start + 1)
+
+        msg.edit_text(
+            f"⬆ Uploading\n"
+            f"Progress: {p}%\n"
+            f"Speed: {round(speed/1024/1024,2)} MB/s"
+        )
+
     if ext in [".mp4", ".mkv"]:
         file.reply_video(
             new_file,
@@ -223,7 +231,11 @@ def process(file, name, uid):
             progress=uprog
         )
 
-    os.remove(new_file)
+    try:
+        os.remove(new_file)
+        os.remove(thumb)
+    except:
+        pass
 
 # ===== RUN =====
 if __name__ == "__main__":
@@ -233,7 +245,7 @@ if __name__ == "__main__":
 
     while True:
         try:
-            print("🚀 GOD MODE RUNNING")
+            print("🚀 Bot Running...")
             app.run()
         except FloodWait as e:
             time.sleep(e.value)
