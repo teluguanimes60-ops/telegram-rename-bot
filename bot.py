@@ -1,5 +1,6 @@
 # ===== AniToons Rename Bot (FINAL WORKING VERSION) =====
-
+import subprocess
+import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
