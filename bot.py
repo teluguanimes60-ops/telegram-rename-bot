@@ -1,24 +1,44 @@
-# ===== AniToons Rename Bot (ULTRA PRO MAX FINAL UPGRADED) =====
+# ===== AniToons Rename Bot (FINAL FIXED + SAVED NAME + FAST FLOW) =====
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
 from config import *
-import os, re, time, threading, subprocess
+import os, re, time, threading, subprocess, json
 from queue import Queue
 from flask import Flask
 
 # ===== SETTINGS =====
 CHANNEL_POST = "https://t.me/Anitoon_edit/33"
 WORKERS = 6
-MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024
 
 # ===== FOLDERS =====
 os.makedirs("thumbs", exist_ok=True)
 os.makedirs("downloads", exist_ok=True)
 os.makedirs("outputs", exist_ok=True)
 
-# ===== WEB KEEP ALIVE =====
+# ===== DATABASE (LOCAL SIMPLE) =====
+DB_FILE = "db.json"
+if not os.path.exists(DB_FILE):
+    json.dump({}, open(DB_FILE, "w"))
+
+def load_db():
+    return json.load(open(DB_FILE))
+
+def save_db(data):
+    json.dump(data, open(DB_FILE, "w"))
+
+def get_user(uid):
+    return load_db().get(str(uid), {})
+
+def set_user(uid, key, value):
+    db = load_db()
+    if str(uid) not in db:
+        db[str(uid)] = {}
+    db[str(uid)][key] = value
+    save_db(db)
+
+# ===== WEB =====
 web = Flask(__name__)
 
 @web.route("/")
@@ -29,13 +49,7 @@ def run_web():
     web.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
 
 # ===== BOT =====
-app = Client(
-    "bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN,
-    workers=120
-)
+app = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN, workers=120)
 
 # ===== DATA =====
 task_queue = Queue()
@@ -46,49 +60,37 @@ active_tasks = 0
 # ===== SMART RENAME =====
 def smart_name(name):
     name = re.sub(r'@\w+', '', name)
-    name = re.sub(r'https?://\S+', '', name)
     name = re.sub(r'\[.*?\]|\(.*?\)', '', name)
-
-    quality = re.findall(r'(480p|720p|1080p|2160p|4k)', name, re.I)
-    quality = quality[0].upper() if quality else ""
-
     name = re.sub(r'[._\-]', ' ', name)
     name = re.sub(r'\s+', ' ', name).strip()
-
-    return f"{name.title()} {quality}".strip() or "AniToon_File"
+    return name.title() or "AniToon_File"
 
 # ===== UI =====
 def bar(p):
     return "█"*int(p/10) + "░"*(10-int(p/10))
 
-def progress_text(p, speed):
-    return (
-        f"🚀 Processing File...\n\n"
-        f"[{bar(p)}] {p}%\n\n"
-        f"⚡ Speed: {round(speed/1024/1024,2)} MB/s\n"
-        f"🔥 High Speed Mode Enabled"
-    )
-
-def progress_btn():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 Updates", url=CHANNEL_POST)],
-        [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
-    ])
-
 def main_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📁 Rename File", callback_data="rename")],
-        [InlineKeyboardButton("🎬 Convert Video/File", callback_data="convert")],
-        [InlineKeyboardButton("⚙ Settings", callback_data="settings")],
-        [InlineKeyboardButton("📊 Status", callback_data="status")]
+        [InlineKeyboardButton("📁 Rename", callback_data="rename")],
+        [InlineKeyboardButton("🎬 Convert", callback_data="convert")],
+        [InlineKeyboardButton("⚙ Settings", callback_data="settings")]
     ])
 
-def rename_menu():
-    return InlineKeyboardMarkup([
+def rename_menu(uid):
+    saved = get_user(uid).get("saved_name")
+
+    btn = [
         [InlineKeyboardButton("⚡ Auto Rename", callback_data="auto")],
-        [InlineKeyboardButton("✏ Manual Rename", callback_data="manual")],
-        [InlineKeyboardButton("🔙 Back", callback_data="back")]
-    ])
+        [InlineKeyboardButton("✏ Manual Rename", callback_data="manual")]
+    ]
+
+    if saved:
+        btn.append([InlineKeyboardButton("📌 Use Saved Name", callback_data="saved")])
+    else:
+        btn.append([InlineKeyboardButton("➕ Set Saved Name", callback_data="setname")])
+
+    btn.append([InlineKeyboardButton("🔙 Back", callback_data="back")])
+    return InlineKeyboardMarkup(btn)
 
 def convert_menu():
     return InlineKeyboardMarkup([
@@ -99,6 +101,7 @@ def convert_menu():
 
 def settings_menu():
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📌 Change Saved Name", callback_data="setname")],
         [InlineKeyboardButton("🖼 Set Thumbnail", callback_data="thumb")],
         [InlineKeyboardButton("🔙 Back", callback_data="back")]
     ])
@@ -108,40 +111,50 @@ def settings_menu():
 def start(client, msg):
     msg.reply_text(
         "🔥 **AniToons Bot**\n\n"
-        "⚡ Fast Rename\n"
-        "🎬 Convert File ↔ Video\n"
-        "🖼 Auto Thumbnail System\n\n"
-        "👇 Choose option:",
+        "⚡ Rename + Convert\n"
+        "📦 Fast Processing System\n\n"
+        "👇 Choose:",
         reply_markup=main_menu()
     )
 
 # ===== BUTTONS =====
 @app.on_callback_query()
 def buttons(client, q):
+
     uid = q.from_user.id
     data = q.data
     q.answer()
 
     if data == "rename":
-        user_mode[uid] = "rename"
-        q.message.edit_text("📁 Send file", reply_markup=rename_menu())
+        user_mode[uid] = "waiting_file"
+        q.message.edit_text("📁 Send file first")
 
     elif data == "convert":
         user_mode[uid] = "convert"
-        q.message.edit_text("🎬 Choose conversion", reply_markup=convert_menu())
+        q.message.edit_text("🎬 Choose option", reply_markup=convert_menu())
 
     elif data == "settings":
-        q.message.edit_text("⚙ Send thumbnail image", reply_markup=settings_menu())
+        q.message.edit_text("⚙ Settings", reply_markup=settings_menu())
+
+    elif data == "setname":
+        user_mode[uid] = "setname"
+        q.message.edit_text("📌 Send name to save")
 
     elif data == "manual":
         user_mode[uid] = "manual"
-        q.message.edit_text("✏ Send new filename")
+        q.message.edit_text("✏ Send new name")
 
     elif data == "auto":
         file = user_files.get(uid)
         if file:
-            name = file.document.file_name if file.document else "file"
-            task_queue.put((file, smart_name(name)))
+            name = smart_name(file.document.file_name)
+            task_queue.put((file, name))
+
+    elif data == "saved":
+        file = user_files.get(uid)
+        saved = get_user(uid).get("saved_name")
+        if file and saved:
+            task_queue.put((file, saved))
 
     elif data == "f2v":
         user_mode[uid] = "f2v"
@@ -153,7 +166,7 @@ def buttons(client, q):
 
     elif data == "thumb":
         user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Send image")
+        q.message.edit_text("🖼 Send thumbnail image")
 
     elif data == "back":
         user_mode[uid] = None
@@ -166,24 +179,24 @@ def file_handler(client, msg):
     uid = msg.from_user.id
     mode = user_mode.get(uid)
 
-    if msg.document and msg.document.file_size > MAX_FILE_SIZE:
-        msg.reply_text("❌ File too large")
-        return
-
+    # CONVERT
     if mode in ["f2v", "v2f"]:
         task_queue.put((msg, "converted"))
         return
 
-    user_files[uid] = msg
-
-    name = msg.document.file_name if msg.document else "file"
-    sug = smart_name(name)
-
-    msg.reply_text(f"✨ Suggested:\n`{sug}`", reply_markup=rename_menu())
+    # RENAME FLOW
+    if mode == "waiting_file":
+        user_files[uid] = msg
+        msg.reply_text(
+            "📂 File received\n\nChoose rename option:",
+            reply_markup=rename_menu(uid)
+        )
+        return
 
 # ===== TEXT =====
 @app.on_message(filters.text & ~filters.command("start"))
 def text_handler(client, msg):
+
     uid = msg.from_user.id
 
     if user_mode.get(uid) == "manual":
@@ -191,17 +204,22 @@ def text_handler(client, msg):
         if file:
             task_queue.put((file, msg.text.strip()))
 
+    elif user_mode.get(uid) == "setname":
+        set_user(uid, "saved_name", msg.text.strip())
+        msg.reply_text("✅ Saved name updated")
+
 # ===== THUMB =====
 @app.on_message(filters.photo)
 def thumb(client, msg):
+
     uid = msg.from_user.id
 
     if user_mode.get(uid) != "thumb":
         return
 
     path = msg.download(f"thumbs/{uid}.jpg")
-    user_mode[uid] = None
-    msg.reply_text("✅ Thumbnail Saved")
+    set_user(uid, "thumb", path)
+    msg.reply_text("✅ Thumbnail saved")
 
 # ===== WORKER =====
 def worker():
@@ -219,19 +237,16 @@ def worker():
         active_tasks -= 1
         task_queue.task_done()
 
-# ===== AUTO THUMB FROM VIDEO =====
-def generate_thumb(video_path, uid):
-    thumb_path = f"thumbs/{uid}_auto.jpg"
-    try:
-        subprocess.run([
-            "ffmpeg", "-i", video_path,
-            "-ss", "00:00:02",
-            "-vframes", "1",
-            thumb_path
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return thumb_path if os.path.exists(thumb_path) else None
-    except:
-        return None
+# ===== AUTO THUMB =====
+def auto_thumb(video, uid):
+    path = f"thumbs/{uid}_auto.jpg"
+    subprocess.run([
+        "ffmpeg", "-i", video,
+        "-ss", "00:00:02",
+        "-vframes", "1",
+        path
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return path if os.path.exists(path) else None
 
 # ===== PROCESS =====
 def process(file, name):
@@ -239,50 +254,52 @@ def process(file, name):
     uid = file.from_user.id
     mode = user_mode.get(uid)
 
-    pmsg = file.reply_text("🚀 Processing...", reply_markup=progress_btn())
+    pmsg = file.reply_text("⬇ Downloading...")
+
     start = time.time()
 
     def progress(c, t):
         p = int(c*100/t)
         speed = c/(time.time()-start+1)
-        try:
-            pmsg.edit_text(progress_text(p, speed), reply_markup=progress_btn())
-        except:
-            pass
+        pmsg.edit_text(f"⬇ Downloading\n[{bar(p)}] {p}%\n⚡ {round(speed/1024/1024,2)} MB/s")
 
     path = file.download(file_name=f"downloads/{time.time()}", progress=progress)
 
-    # ===== CONVERT =====
+    # CONVERT
     if mode == "f2v":
+        pmsg.edit_text("🔄 Converting to video...")
         out = f"outputs/{time.time()}.mp4"
-        subprocess.run(["ffmpeg", "-i", path, "-c:v", "libx264", "-preset", "ultrafast", out])
+        subprocess.run(["ffmpeg","-i",path,"-preset","ultrafast",out])
         path = out
 
     elif mode == "v2f":
+        pmsg.edit_text("🔄 Converting to file...")
         out = f"outputs/{time.time()}.mkv"
-        subprocess.run(["ffmpeg", "-i", path, "-c", "copy", out])
+        subprocess.run(["ffmpeg","-i",path,"-c","copy",out])
         path = out
 
     ext = os.path.splitext(path)[1]
     new_file = f"outputs/{name}{ext}"
     os.rename(path, new_file)
 
-    # ===== THUMB =====
-    thumb = f"thumbs/{uid}.jpg"
-    if not os.path.exists(thumb) and ext in [".mp4", ".mkv"]:
-        thumb = generate_thumb(new_file, uid)
+    # THUMB
+    thumb = get_user(uid).get("thumb")
+    if not thumb and ext in [".mp4", ".mkv"]:
+        thumb = auto_thumb(new_file, uid)
 
-    # ===== SEND =====
+    # UPLOAD
+    pmsg.edit_text("⬆ Uploading...")
+
+    def up(c, t):
+        p = int(c*100/t)
+        pmsg.edit_text(f"⬆ Uploading\n[{bar(p)}] {p}%")
+
     if ext in [".mp4", ".mkv"]:
-        file.reply_video(
-            new_file,
-            caption=f"✅ {name}",
-            thumb=thumb if thumb else None,
-            supports_streaming=True
-        )
+        file.reply_video(new_file, caption=f"✅ {name}", thumb=thumb, progress=up)
     else:
-        file.reply_document(new_file, caption=f"✅ {name}")
+        file.reply_document(new_file, caption=f"✅ {name}", progress=up)
 
+    pmsg.delete()
     os.remove(new_file)
 
 # ===== RUN =====
