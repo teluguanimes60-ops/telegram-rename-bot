@@ -1,17 +1,17 @@
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from database import add_user
 
 @Client.on_message(filters.command("start"))
 def start(client, message):
-    add_user(message.from_user.id)
 
     buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📁 Rename", callback_data="rename_menu")],
-        [InlineKeyboardButton("📊 Profile", callback_data="profile")]
+        [InlineKeyboardButton("📁 Rename File", callback_data="rename")],
+        [InlineKeyboardButton("🎬 Video Tools", callback_data="video")],
+        [InlineKeyboardButton("⚙ Settings", callback_data="settings")],
+        [InlineKeyboardButton("📊 Status", callback_data="status")]
     ])
 
     message.reply_text(
-        "🤖 Full Utility Bot\n\nSelect option:",
+        "🔥 **AniToons Rename Bot**\n\nFull Utility Bot Ready 🚀",
         reply_markup=buttons
     )
