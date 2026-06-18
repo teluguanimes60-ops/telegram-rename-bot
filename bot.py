@@ -105,92 +105,53 @@ def start(_, m):
         "👇 Choose option",
         reply_markup=main_menu()
     )
-
+    
 # ===== BUTTONS =====
 @app.on_callback_query()
 def cb(_, q):
+
     uid = q.from_user.id
-    d = q.data
+    data = q.data
     q.answer()
 
-    if d == "rename":
-        user_mode[uid] = "wait_file"
-        q.message.reply_text("📁 Send file to rename")
-
-    elif d == "convert":
+    # ===== CONVERT MENU =====
+    if data == "convert":
         user_mode[uid] = "convert_select"
-        q.message.reply_text("🎬 Choose option", reply_markup=convert_menu())
+        q.message.reply_text(
+            "🎬 Choose conversion type",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📹 File → Video", callback_data="f2v")],
+                [InlineKeyboardButton("📁 Video → File", callback_data="v2f")]
+            ])
+        )
 
-    elif d == "settings":
-        q.message.reply_text("⚙ Settings", reply_markup=settings_menu())
+    elif data == "f2v":
+        user_mode[uid] = "f2v_thumb"
+        q.message.reply_text(
+            "🖼 Choose Thumbnail Mode",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⚡ Auto Thumbnail", callback_data="auto_thumb")],
+                [InlineKeyboardButton("💾 Saved Thumbnail", callback_data="saved_thumb")]
+            ])
+        )
 
-    elif d == "auto":
-        f = user_file.get(uid)
-        if f:
-            queue.put((f, smart(get_name(f)), uid, "rename"))
-
-    elif d == "manual":
-        user_mode[uid] = "manual"
-        q.message.reply_text("✏ Send new name")
-
-    elif d == "saved":
-        f = user_file.get(uid)
-        if f:
-            queue.put((f, saved_name.get(uid, "File"), uid, "rename"))
-
-  if data == "convert":
-    user_mode[uid] = "convert_select"
-    q.message.reply_text(
-        "🎬 Choose conversion type",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📹 File → Video", callback_data="f2v")],
-            [InlineKeyboardButton("📁 Video → File", callback_data="v2f")]
-        ])
-    )
-
-elif data == "f2v":
-    user_mode[uid] = "f2v_thumb"
-    q.message.reply_text(
-        "🖼 Choose Thumbnail Mode",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⚡ Auto Thumbnail", callback_data="auto_thumb")],
-            [InlineKeyboardButton("💾 Saved Thumbnail", callback_data="saved_thumb")]
-        ])
-    )
-
-elif data == "auto_thumb":
-    user_thumb_mode[uid] = "auto"
-    user_mode[uid] = "f2v"
-    q.message.reply_text("📤 Send file to convert into video")
-
-elif data == "saved_thumb":
-    if uid not in user_saved_thumb:
-        user_mode[uid] = "save_thumb"
-        q.message.reply_text("📸 Send thumbnail first")
-    else:
-        user_thumb_mode[uid] = "saved"
+    elif data == "auto_thumb":
+        user_thumb_mode[uid] = "auto"
         user_mode[uid] = "f2v"
-        q.message.reply_text("📤 Send file to convert")
-    elif d == "auto_t":
-        user_mode[uid] += "_auto"
+        q.message.reply_text("📤 Send file to convert into video")
 
-    elif d == "save_t":
-        user_mode[uid] += "_saved"
-
-    elif d == "setname":
-        user_mode[uid] = "setname"
-        q.message.reply_text("Send saved name")
-
-    elif d == "setthumb":
-        user_mode[uid] = "setthumb"
-        q.message.reply_text("Send image")
-
-    elif d == "viewthumb":
-        t = user_thumb.get(uid)
-        if t:
-            q.message.reply_photo(t)
+    elif data == "saved_thumb":
+        if uid not in user_saved_thumb:
+            user_mode[uid] = "save_thumb"
+            q.message.reply_text("📸 Send thumbnail first")
         else:
-            q.message.reply_text("❌ No thumbnail set")
+            user_thumb_mode[uid] = "saved"
+            user_mode[uid] = "f2v"
+            q.message.reply_text("📤 Send file to convert")
+
+    elif data == "back":
+        user_mode[uid] = None
+        q.message.reply_text("🏠 Back to menu")
 
 # ===== FILE HANDLER =====
 @app.on_message(filters.document | filters.video | filters.audio)
