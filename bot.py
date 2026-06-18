@@ -1,306 +1,210 @@
-# ===== AniToons Rename Bot (FINAL FIXED + SAVED NAME + FAST FLOW) =====
+# ===== AniToons Rename Bot (GOD MODE FINAL SYSTEM) =====
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
 from config import *
-import os, re, time, threading, subprocess, json
-from queue import Queue
-from flask import Flask
 
-# ===== SETTINGS =====
-CHANNEL_POST = "https://t.me/Anitoon_edit/33"
-WORKERS = 6
+import os, re, time, threading, subprocess
+from queue import Queue
+
+# ===== CORE SETTINGS =====
+WORKERS = 10
+EDIT_DELAY = 1.2   # avoid flood
+MAX_SIZE = 2 * 1024 * 1024 * 1024
 
 # ===== FOLDERS =====
-os.makedirs("thumbs", exist_ok=True)
-os.makedirs("downloads", exist_ok=True)
-os.makedirs("outputs", exist_ok=True)
-
-# ===== DATABASE (LOCAL SIMPLE) =====
-DB_FILE = "db.json"
-if not os.path.exists(DB_FILE):
-    json.dump({}, open(DB_FILE, "w"))
-
-def load_db():
-    return json.load(open(DB_FILE))
-
-def save_db(data):
-    json.dump(data, open(DB_FILE, "w"))
-
-def get_user(uid):
-    return load_db().get(str(uid), {})
-
-def set_user(uid, key, value):
-    db = load_db()
-    if str(uid) not in db:
-        db[str(uid)] = {}
-    db[str(uid)][key] = value
-    save_db(db)
-
-# ===== WEB =====
-web = Flask(__name__)
-
-@web.route("/")
-def home():
-    return "Bot Running ✅"
-
-def run_web():
-    web.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+for f in ["downloads", "outputs", "thumbs"]:
+    os.makedirs(f, exist_ok=True)
 
 # ===== BOT =====
-app = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN, workers=120)
+app = Client(
+    "bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN,
+    workers=200
+)
 
-# ===== DATA =====
+# ===== GLOBAL DATA =====
 task_queue = Queue()
-user_files = {}
 user_mode = {}
-active_tasks = 0
+user_files = {}
+saved_name = {}
+last_edit = {}
 
-# ===== SMART RENAME =====
-def smart_name(name):
-    name = re.sub(r'@\w+', '', name)
-    name = re.sub(r'\[.*?\]|\(.*?\)', '', name)
+# ===== UTIL =====
+def safe_edit(msg, text):
+    now = time.time()
+    if msg.id not in last_edit or now - last_edit[msg.id] > EDIT_DELAY:
+        try:
+            msg.edit_text(text)
+            last_edit[msg.id] = now
+        except:
+            pass
+
+def clean_name(name):
+    name = re.sub(r'@\w+|\[.*?\]|\(.*?\)', '', name)
     name = re.sub(r'[._\-]', ' ', name)
-    name = re.sub(r'\s+', ' ', name).strip()
-    return name.title() or "AniToon_File"
+    name = re.sub(r'\s+', ' ', name)
+    return name.strip().title() or "File"
+
+def get_name(file):
+    return file.document.file_name if file.document else "file"
 
 # ===== UI =====
-def bar(p):
-    return "█"*int(p/10) + "░"*(10-int(p/10))
-
 def main_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📁 Rename", callback_data="rename")],
         [InlineKeyboardButton("🎬 Convert", callback_data="convert")],
-        [InlineKeyboardButton("⚙ Settings", callback_data="settings")]
-    ])
-
-def rename_menu(uid):
-    saved = get_user(uid).get("saved_name")
-
-    btn = [
-        [InlineKeyboardButton("⚡ Auto Rename", callback_data="auto")],
-        [InlineKeyboardButton("✏ Manual Rename", callback_data="manual")]
-    ]
-
-    if saved:
-        btn.append([InlineKeyboardButton("📌 Use Saved Name", callback_data="saved")])
-    else:
-        btn.append([InlineKeyboardButton("➕ Set Saved Name", callback_data="setname")])
-
-    btn.append([InlineKeyboardButton("🔙 Back", callback_data="back")])
-    return InlineKeyboardMarkup(btn)
-
-def convert_menu():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎞 File → Video", callback_data="f2v")],
-        [InlineKeyboardButton("📂 Video → File", callback_data="v2f")],
-        [InlineKeyboardButton("🔙 Back", callback_data="back")]
-    ])
-
-def settings_menu():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📌 Change Saved Name", callback_data="setname")],
-        [InlineKeyboardButton("🖼 Set Thumbnail", callback_data="thumb")],
-        [InlineKeyboardButton("🔙 Back", callback_data="back")]
+        [InlineKeyboardButton("⚙ Save Name", callback_data="save")],
     ])
 
 # ===== START =====
 @app.on_message(filters.command("start"))
-def start(client, msg):
-    msg.reply_text(
-        "🔥 **AniToons Bot**\n\n"
-        "⚡ Rename + Convert\n"
-        "📦 Fast Processing System\n\n"
-        "👇 Choose:",
-        reply_markup=main_menu()
-    )
+def start(_, msg):
+    msg.reply_text("🚀 Ready\nSend files after choosing option", reply_markup=main_menu())
 
 # ===== BUTTONS =====
 @app.on_callback_query()
-def buttons(client, q):
-
+def cb(_, q):
     uid = q.from_user.id
     data = q.data
     q.answer()
 
     if data == "rename":
-        user_mode[uid] = "waiting_file"
-        q.message.edit_text("📁 Send file first")
+        user_mode[uid] = "rename"
+        user_files[uid] = []
+        q.message.reply_text("📁 Send files now")
 
     elif data == "convert":
         user_mode[uid] = "convert"
-        q.message.edit_text("🎬 Choose option", reply_markup=convert_menu())
+        q.message.reply_text("🎬 Send file/video")
 
-    elif data == "settings":
-        q.message.edit_text("⚙ Settings", reply_markup=settings_menu())
-
-    elif data == "setname":
-        user_mode[uid] = "setname"
-        q.message.edit_text("📌 Send name to save")
-
-    elif data == "manual":
-        user_mode[uid] = "manual"
-        q.message.edit_text("✏ Send new name")
-
-    elif data == "auto":
-        file = user_files.get(uid)
-        if file:
-            name = smart_name(file.document.file_name)
-            task_queue.put((file, name))
-
-    elif data == "saved":
-        file = user_files.get(uid)
-        saved = get_user(uid).get("saved_name")
-        if file and saved:
-            task_queue.put((file, saved))
-
-    elif data == "f2v":
-        user_mode[uid] = "f2v"
-        q.message.edit_text("🎞 Send file")
-
-    elif data == "v2f":
-        user_mode[uid] = "v2f"
-        q.message.edit_text("📂 Send video")
-
-    elif data == "thumb":
-        user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Send thumbnail image")
-
-    elif data == "back":
-        user_mode[uid] = None
-        q.message.edit_text("🏠 Menu", reply_markup=main_menu())
+    elif data == "save":
+        user_mode[uid] = "save"
+        q.message.reply_text("✏ Send name to save")
 
 # ===== FILE HANDLER =====
-@app.on_message(filters.document | filters.video)
-def file_handler(client, msg):
+@app.on_message(filters.document | filters.video | filters.audio)
+def files(_, msg):
 
     uid = msg.from_user.id
     mode = user_mode.get(uid)
 
-    # CONVERT
-    if mode in ["f2v", "v2f"]:
-        task_queue.put((msg, "converted"))
+    if msg.document and msg.document.file_size > MAX_SIZE:
+        msg.reply_text("❌ Too large")
         return
 
-    # RENAME FLOW
-    if mode == "waiting_file":
-        user_files[uid] = msg
-        msg.reply_text(
-            "📂 File received\n\nChoose rename option:",
-            reply_markup=rename_menu(uid)
-        )
-        return
+    if mode == "rename":
+        user_files.setdefault(uid, []).append(msg)
+        msg.reply_text(f"📦 Added ({len(user_files[uid])})\nSend name now")
+
+    elif mode == "convert":
+        task_queue.put((msg, "convert", uid))
 
 # ===== TEXT =====
 @app.on_message(filters.text & ~filters.command("start"))
-def text_handler(client, msg):
+def text(_, msg):
 
     uid = msg.from_user.id
+    mode = user_mode.get(uid)
 
-    if user_mode.get(uid) == "manual":
-        file = user_files.get(uid)
-        if file:
-            task_queue.put((file, msg.text.strip()))
+    if mode == "save":
+        saved_name[uid] = msg.text
+        msg.reply_text("✅ Saved")
 
-    elif user_mode.get(uid) == "setname":
-        set_user(uid, "saved_name", msg.text.strip())
-        msg.reply_text("✅ Saved name updated")
-
-# ===== THUMB =====
-@app.on_message(filters.photo)
-def thumb(client, msg):
-
-    uid = msg.from_user.id
-
-    if user_mode.get(uid) != "thumb":
-        return
-
-    path = msg.download(f"thumbs/{uid}.jpg")
-    set_user(uid, "thumb", path)
-    msg.reply_text("✅ Thumbnail saved")
+    elif mode == "rename":
+        for f in user_files.get(uid, []):
+            name = msg.text or saved_name.get(uid) or clean_name(get_name(f))
+            task_queue.put((f, name, uid))
 
 # ===== WORKER =====
 def worker():
-    global active_tasks
-
     while True:
-        file, name = task_queue.get()
-        active_tasks += 1
-
+        file, name, uid = task_queue.get()
         try:
-            process(file, name)
-        except Exception as e:
-            file.reply_text(f"❌ {e}")
-
-        active_tasks -= 1
+            process(file, name, uid)
+        except:
+            try:
+                file.reply_text("❌ Failed")
+            except:
+                pass
         task_queue.task_done()
 
-# ===== AUTO THUMB =====
-def auto_thumb(video, uid):
-    path = f"thumbs/{uid}_auto.jpg"
-    subprocess.run([
-        "ffmpeg", "-i", video,
-        "-ss", "00:00:02",
-        "-vframes", "1",
-        path
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return path if os.path.exists(path) else None
+# ===== PROCESS ENGINE =====
+def process(file, name, uid):
 
-# ===== PROCESS =====
-def process(file, name):
+    msg = file.reply_text(f"⏳ Queue: {task_queue.qsize()}")
 
-    uid = file.from_user.id
-    mode = user_mode.get(uid)
-
-    pmsg = file.reply_text("⬇ Downloading...")
-
+    # ===== DOWNLOAD =====
     start = time.time()
 
-    def progress(c, t):
-        p = int(c*100/t)
-        speed = c/(time.time()-start+1)
-        pmsg.edit_text(f"⬇ Downloading\n[{bar(p)}] {p}%\n⚡ {round(speed/1024/1024,2)} MB/s")
+    def dprog(c, t):
+        p = int(c * 100 / t)
+        speed = c / (time.time() - start + 1)
+        safe_edit(msg, f"⬇ Download {p}%\n⚡ {round(speed/1024/1024,2)} MB/s")
 
-    path = file.download(file_name=f"downloads/{time.time()}", progress=progress)
+    path = file.download(file_name=f"downloads/{time.time()}", progress=dprog)
 
-    # CONVERT
-    if mode == "f2v":
-        pmsg.edit_text("🔄 Converting to video...")
-        out = f"outputs/{time.time()}.mp4"
-        subprocess.run(["ffmpeg","-i",path,"-preset","ultrafast",out])
+    if not path:
+        return
+
+    # ===== MODE =====
+    mode = user_mode.get(uid)
+
+    safe_edit(msg, "⚙ Processing...")
+
+    # ===== CONVERT =====
+    if name == "convert":
+        if path.endswith(".mp4"):
+            out = f"outputs/{time.time()}.mkv"
+            subprocess.run(["ffmpeg","-i",path,"-c","copy",out])
+        else:
+            out = f"outputs/{time.time()}.mp4"
+            subprocess.run(["ffmpeg","-i",path,out])
         path = out
 
-    elif mode == "v2f":
-        pmsg.edit_text("🔄 Converting to file...")
-        out = f"outputs/{time.time()}.mkv"
-        subprocess.run(["ffmpeg","-i",path,"-c","copy",out])
-        path = out
+    # ===== THUMB =====
+    thumb = f"thumbs/{time.time()}.jpg"
+    subprocess.run([
+        "ffmpeg","-i",path,
+        "-ss","2",
+        "-vframes","1",
+        thumb
+    ])
 
+    # ===== RENAME =====
     ext = os.path.splitext(path)[1]
-    new_file = f"outputs/{name}{ext}"
-    os.rename(path, new_file)
+    new = f"outputs/{name}{ext}"
+    os.rename(path, new)
 
-    # THUMB
-    thumb = get_user(uid).get("thumb")
-    if not thumb and ext in [".mp4", ".mkv"]:
-        thumb = auto_thumb(new_file, uid)
+    # ===== UPLOAD =====
+    def uprog(c, t):
+        p = int(c * 100 / t)
+        safe_edit(msg, f"⬆ Upload {p}%")
 
-    # UPLOAD
-    pmsg.edit_text("⬆ Uploading...")
+    # ===== SEND FIXED =====
+    try:
+        if ext in [".mp4", ".mkv"]:
+            file.reply_video(
+                new,
+                caption=f"✅ {name}",
+                thumb=thumb,
+                progress=uprog
+            )
+        else:
+            file.reply_document(
+                new,
+                caption=f"✅ {name}",
+                thumb=thumb,
+                progress=uprog
+            )
+    except:
+        file.reply_document(new, caption=f"✅ {name}")
 
-    def up(c, t):
-        p = int(c*100/t)
-        pmsg.edit_text(f"⬆ Uploading\n[{bar(p)}] {p}%")
-
-    if ext in [".mp4", ".mkv"]:
-        file.reply_video(new_file, caption=f"✅ {name}", thumb=thumb, progress=up)
-    else:
-        file.reply_document(new_file, caption=f"✅ {name}", progress=up)
-
-    pmsg.delete()
-    os.remove(new_file)
+    os.remove(new)
+    safe_edit(msg, "✅ Done")
 
 # ===== RUN =====
 if __name__ == "__main__":
@@ -308,11 +212,9 @@ if __name__ == "__main__":
     for _ in range(WORKERS):
         threading.Thread(target=worker, daemon=True).start()
 
-    threading.Thread(target=run_web, daemon=True).start()
-
     while True:
         try:
-            print("🚀 Bot Started")
+            print("🚀 GOD MODE RUNNING")
             app.run()
         except FloodWait as e:
             time.sleep(e.value)
