@@ -1,21 +1,24 @@
-# ===== AniToons Rename Bot (GOD MODE FINAL SYSTEM) =====
+# ===== AniToons Rename Bot (GOD MODE ULTRA SYSTEM) =====
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
 from config import *
-
 import os, re, time, threading, subprocess
 from queue import Queue
 
-# ===== CORE SETTINGS =====
+# ===== SETTINGS =====
 WORKERS = 10
-EDIT_DELAY = 1.2   # avoid flood
-MAX_SIZE = 2 * 1024 * 1024 * 1024
 
 # ===== FOLDERS =====
-for f in ["downloads", "outputs", "thumbs"]:
-    os.makedirs(f, exist_ok=True)
+BASE = os.getcwd()
+DOWNLOAD = f"{BASE}/downloads"
+OUTPUT = f"{BASE}/outputs"
+THUMB = f"{BASE}/thumbs"
+SCREEN = f"{BASE}/screens"
+
+for p in [DOWNLOAD, OUTPUT, THUMB, SCREEN]:
+    os.makedirs(p, exist_ok=True)
 
 # ===== BOT =====
 app = Client(
@@ -26,48 +29,38 @@ app = Client(
     workers=200
 )
 
-# ===== GLOBAL DATA =====
+# ===== DATA =====
 task_queue = Queue()
 user_mode = {}
 user_files = {}
 saved_name = {}
-last_edit = {}
+active_tasks = 0
 
-# ===== UTIL =====
-def safe_edit(msg, text):
-    now = time.time()
-    if msg.id not in last_edit or now - last_edit[msg.id] > EDIT_DELAY:
-        try:
-            msg.edit_text(text)
-            last_edit[msg.id] = now
-        except:
-            pass
-
-def clean_name(name):
+# ===== SMART RENAME =====
+def smart_name(name):
     name = re.sub(r'@\w+|\[.*?\]|\(.*?\)', '', name)
     name = re.sub(r'[._\-]', ' ', name)
     name = re.sub(r'\s+', ' ', name)
     return name.strip().title() or "File"
 
-def get_name(file):
-    return file.document.file_name if file.document else "file"
-
 # ===== UI =====
-def main_menu():
+def menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📁 Rename", callback_data="rename")],
         [InlineKeyboardButton("🎬 Convert", callback_data="convert")],
-        [InlineKeyboardButton("⚙ Save Name", callback_data="save")],
+        [InlineKeyboardButton("📸 Screenshots", callback_data="ss")],
+        [InlineKeyboardButton("⚙ Save Name", callback_data="setname")]
     ])
 
 # ===== START =====
 @app.on_message(filters.command("start"))
-def start(_, msg):
-    msg.reply_text("🚀 Ready\nSend files after choosing option", reply_markup=main_menu())
+def start(_, m):
+    m.reply_text("🚀 GOD MODE BOT READY", reply_markup=menu())
 
 # ===== BUTTONS =====
 @app.on_callback_query()
 def cb(_, q):
+
     uid = q.from_user.id
     data = q.data
     q.answer()
@@ -75,136 +68,162 @@ def cb(_, q):
     if data == "rename":
         user_mode[uid] = "rename"
         user_files[uid] = []
-        q.message.reply_text("📁 Send files now")
+        q.message.reply_text("📁 Send files")
 
     elif data == "convert":
         user_mode[uid] = "convert"
         q.message.reply_text("🎬 Send file/video")
 
-    elif data == "save":
-        user_mode[uid] = "save"
-        q.message.reply_text("✏ Send name to save")
+    elif data == "ss":
+        user_mode[uid] = "ss"
+        q.message.reply_text("🎬 Send video")
+
+    elif data == "setname":
+        user_mode[uid] = "setname"
+        q.message.reply_text("📌 Send name")
 
 # ===== FILE HANDLER =====
 @app.on_message(filters.document | filters.video | filters.audio)
-def files(_, msg):
+def file_handler(_, m):
 
-    uid = msg.from_user.id
+    uid = m.from_user.id
     mode = user_mode.get(uid)
 
-    if msg.document and msg.document.file_size > MAX_SIZE:
-        msg.reply_text("❌ Too large")
-        return
+    user_files.setdefault(uid, []).append(m)
 
     if mode == "rename":
-        user_files.setdefault(uid, []).append(msg)
-        msg.reply_text(f"📦 Added ({len(user_files[uid])})\nSend name now")
+        m.reply_text("✏ Send name OR wait for auto")
 
     elif mode == "convert":
-        task_queue.put((msg, "convert", uid))
+        task_queue.put((m, "convert", uid))
+
+    elif mode == "ss":
+        task_queue.put((m, "ss", uid))
 
 # ===== TEXT =====
 @app.on_message(filters.text & ~filters.command("start"))
-def text(_, msg):
+def text(_, m):
 
-    uid = msg.from_user.id
+    uid = m.from_user.id
     mode = user_mode.get(uid)
 
-    if mode == "save":
-        saved_name[uid] = msg.text
-        msg.reply_text("✅ Saved")
+    if mode == "setname":
+        saved_name[uid] = m.text
+        m.reply_text("✅ Saved")
 
     elif mode == "rename":
         for f in user_files.get(uid, []):
-            name = msg.text or saved_name.get(uid) or clean_name(get_name(f))
+            name = m.text or saved_name.get(uid) or smart_name(get_name(f))
             task_queue.put((f, name, uid))
+
+# ===== NAME =====
+def get_name(f):
+    return f.document.file_name if f.document else "file"
 
 # ===== WORKER =====
 def worker():
+    global active_tasks
+
     while True:
         file, name, uid = task_queue.get()
+        active_tasks += 1
+
         try:
             process(file, name, uid)
-        except:
+        except Exception as e:
             try:
-                file.reply_text("❌ Failed")
+                file.reply_text("❌ Error occurred")
             except:
                 pass
+
+        active_tasks -= 1
         task_queue.task_done()
 
-# ===== PROCESS ENGINE =====
+# ===== PROCESS =====
 def process(file, name, uid):
 
-    msg = file.reply_text(f"⏳ Queue: {task_queue.qsize()}")
+    qpos = task_queue.qsize()
+    msg = file.reply_text(f"⏳ Queue: {qpos}")
 
-    # ===== DOWNLOAD =====
     start = time.time()
 
+    # ===== DOWNLOAD =====
     def dprog(c, t):
-        p = int(c * 100 / t)
-        speed = c / (time.time() - start + 1)
-        safe_edit(msg, f"⬇ Download {p}%\n⚡ {round(speed/1024/1024,2)} MB/s")
+        p = int(c*100/t)
+        speed = c/(time.time()-start+1)
+        eta = (t-c)/(speed+1)
 
-    path = file.download(file_name=f"downloads/{time.time()}", progress=dprog)
+        msg.edit_text(
+            f"⬇ Downloading\n"
+            f"{p}%\n"
+            f"⚡ {round(speed/1024/1024,2)} MB/s\n"
+            f"⏱ ETA: {int(eta)}s"
+        )
+
+    path = file.download(file_name=f"{DOWNLOAD}/{time.time()}", progress=dprog)
 
     if not path:
         return
 
-    # ===== MODE =====
-    mode = user_mode.get(uid)
+    msg.edit_text("⚙ Processing...")
 
-    safe_edit(msg, "⚙ Processing...")
+    mode = user_mode.get(uid)
 
     # ===== CONVERT =====
     if name == "convert":
         if path.endswith(".mp4"):
-            out = f"outputs/{time.time()}.mkv"
+            out = f"{OUTPUT}/{time.time()}.mkv"
             subprocess.run(["ffmpeg","-i",path,"-c","copy",out])
         else:
-            out = f"outputs/{time.time()}.mp4"
+            out = f"{OUTPUT}/{time.time()}.mp4"
             subprocess.run(["ffmpeg","-i",path,out])
         path = out
 
+    # ===== SCREENSHOTS =====
+    elif name == "ss":
+        for i in range(1,6):
+            img = f"{SCREEN}/{time.time()}_{i}.jpg"
+            subprocess.run([
+                "ffmpeg","-i",path,
+                "-ss",str(i*2),
+                "-vframes","1",img
+            ])
+            file.reply_photo(img)
+        return
+
     # ===== THUMB =====
-    thumb = f"thumbs/{time.time()}.jpg"
-    subprocess.run([
-        "ffmpeg","-i",path,
-        "-ss","2",
-        "-vframes","1",
-        thumb
-    ])
+    thumb = f"{THUMB}/{time.time()}.jpg"
+    subprocess.run(["ffmpeg","-i",path,"-ss","3","-vframes","1",thumb])
 
     # ===== RENAME =====
     ext = os.path.splitext(path)[1]
-    new = f"outputs/{name}{ext}"
-    os.rename(path, new)
+    new_file = f"{OUTPUT}/{name}{ext}"
+    os.rename(path, new_file)
 
-    # ===== UPLOAD =====
+    msg.edit_text("⬆ Uploading...")
+
+    # ===== UPLOAD PROGRESS =====
     def uprog(c, t):
-        p = int(c * 100 / t)
-        safe_edit(msg, f"⬆ Upload {p}%")
+        p = int(c*100/t)
+        msg.edit_text(f"⬆ Uploading\n{p}%")
 
     # ===== SEND FIXED =====
-    try:
-        if ext in [".mp4", ".mkv"]:
-            file.reply_video(
-                new,
-                caption=f"✅ {name}",
-                thumb=thumb,
-                progress=uprog
-            )
-        else:
-            file.reply_document(
-                new,
-                caption=f"✅ {name}",
-                thumb=thumb,
-                progress=uprog
-            )
-    except:
-        file.reply_document(new, caption=f"✅ {name}")
+    if ext in [".mp4", ".mkv"]:
+        file.reply_video(
+            new_file,
+            caption=f"✅ {name}",
+            thumb=thumb,
+            progress=uprog
+        )
+    else:
+        file.reply_document(
+            new_file,
+            caption=f"✅ {name}",
+            thumb=thumb,
+            progress=uprog
+        )
 
-    os.remove(new)
-    safe_edit(msg, "✅ Done")
+    os.remove(new_file)
 
 # ===== RUN =====
 if __name__ == "__main__":
