@@ -35,6 +35,9 @@ def run_web():
 app = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 # ===== DATA =====
+# 🔥 THUMB SYSTEM
+user_thumb_mode = {}   # auto / saved
+user_saved_thumb = {}  # thumbnail path
 queue = Queue()
 user_mode = {}
 user_file = {}
@@ -135,14 +138,39 @@ def cb(_, q):
         if f:
             queue.put((f, saved_name.get(uid, "File"), uid, "rename"))
 
-    elif d == "f2v":
+  if data == "convert":
+    user_mode[uid] = "convert_select"
+    q.message.reply_text(
+        "🎬 Choose conversion type",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📹 File → Video", callback_data="f2v")],
+            [InlineKeyboardButton("📁 Video → File", callback_data="v2f")]
+        ])
+    )
+
+elif data == "f2v":
+    user_mode[uid] = "f2v_thumb"
+    q.message.reply_text(
+        "🖼 Choose Thumbnail Mode",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚡ Auto Thumbnail", callback_data="auto_thumb")],
+            [InlineKeyboardButton("💾 Saved Thumbnail", callback_data="saved_thumb")]
+        ])
+    )
+
+elif data == "auto_thumb":
+    user_thumb_mode[uid] = "auto"
+    user_mode[uid] = "f2v"
+    q.message.reply_text("📤 Send file to convert into video")
+
+elif data == "saved_thumb":
+    if uid not in user_saved_thumb:
+        user_mode[uid] = "save_thumb"
+        q.message.reply_text("📸 Send thumbnail first")
+    else:
+        user_thumb_mode[uid] = "saved"
         user_mode[uid] = "f2v"
-        q.message.reply_text("Send file", reply_markup=thumb_menu())
-
-    elif d == "v2f":
-        user_mode[uid] = "v2f"
-        q.message.reply_text("Send video", reply_markup=thumb_menu())
-
+        q.message.reply_text("📤 Send file to convert")
     elif d == "auto_t":
         user_mode[uid] += "_auto"
 
@@ -189,6 +217,20 @@ def text(_, m):
         saved_name[uid] = m.text
         m.reply_text("✅ Saved Name Updated")
 
+# ===== SAVE THUMBNAIL =====
+@app.on_message(filters.photo)
+def save_thumb(_, m):
+    uid = m.from_user.id
+
+    if user_mode.get(uid) != "save_thumb":
+        return
+
+    path = m.download(f"{THUMB}/{uid}.jpg")
+    user_saved_thumb[uid] = path
+    user_mode[uid] = None
+
+    m.reply_text("✅ Thumbnail Saved")
+
 # ===== THUMB =====
 @app.on_message(filters.photo)
 def thumb(_, m):
@@ -211,109 +253,81 @@ def worker():
                 pass
         queue.task_done()
 
-# ===== PROCESS =====
-def process(file, name, uid, mode):
+def process(file, name, uid):
 
-    msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn())
+    msg = file.reply_text("⏳ Starting...")
+
     start = time.time()
 
-    # DOWNLOAD
+    # ===== DOWNLOAD =====
     def dprog(c, t):
-        try:
-            p = int(c*100/t)
-            speed = c/(time.time()-start+1)
-            eta = int((t-c)/(speed+1))
+        p = int(c*100/t)
+        speed = c/(time.time()-start+1)
+        eta = (t-c)/(speed+1)
 
-            msg.edit_text(
-                f"⬇ Downloading...\n"
-                f"{progress_bar(p)} {p}%\n"
-                f"⚡ {round(speed/1024/1024,2)} MB/s\n"
-                f"⏳ {eta}s left",
-                reply_markup=progress_btn()
-            )
-        except:
-            pass
+        msg.edit_text(
+            f"⬇ Downloading\n{p}%\n⚡ {round(speed/1024/1024,2)} MB/s\n⏱ ETA {int(eta)}s"
+        )
 
     path = file.download(file_name=f"{DOWNLOAD}/{time.time()}", progress=dprog)
 
-    if not path:
-        msg.edit_text("❌ Download Failed")
-        return
+    msg.edit_text("⚙ Processing...")
 
-    msg.edit_text("⚙ Processing...", reply_markup=progress_btn())
+    mode = user_mode.get(uid)
 
-    # CONVERT
-    try:
-        if "convert" in mode:
-            if path.endswith(".mp4"):
-                out = f"{OUTPUT}/{time.time()}.mkv"
-                subprocess.run(["ffmpeg","-y","-i",path,"-c","copy",out])
-            else:
-                out = f"{OUTPUT}/{time.time()}.mp4"
-                subprocess.run(["ffmpeg","-y","-i",path,out])
-            path = out
-    except:
-        msg.edit_text("❌ Convert Failed")
-        return
+    # ===== CONVERT FILE → VIDEO =====
+    if mode == "f2v":
+        out = f"{OUTPUT}/{time.time()}.mp4"
 
-    # THUMB
+        subprocess.run([
+            "ffmpeg", "-i", path,
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-c:a", "aac",
+            "-movflags", "+faststart",
+            out
+        ])
+
+        path = out
+
+    # ===== THUMB =====
     thumb = None
-    try:
-        if "auto" in mode:
-            thumb = f"{THUMB}/{time.time()}.jpg"
-            subprocess.run(["ffmpeg","-y","-i",path,"-ss","2","-vframes","1",thumb])
-        else:
-            thumb = user_thumb.get(uid)
-    except:
-        pass
 
-    # RENAME
-    ext = os.path.splitext(path)[1]
-    new = f"{OUTPUT}/{name}{ext}"
-    try:
-        os.rename(path, new)
-    except:
-        new = path
+    if user_thumb_mode.get(uid) == "saved":
+        thumb = user_saved_thumb.get(uid)
 
-    # UPLOAD
+    elif user_thumb_mode.get(uid) == "auto":
+        thumb = f"{THUMB}/{time.time()}.jpg"
+        subprocess.run([
+            "ffmpeg", "-i", path,
+            "-ss", "2",
+            "-vframes", "1",
+            thumb
+        ])
+
+    # ===== UPLOAD =====
+    msg.edit_text("⬆ Uploading...")
+
     def uprog(c, t):
-        try:
-            p = int(c*100/t)
-            msg.edit_text(
-                f"⬆ Uploading...\n{progress_bar(p)} {p}%",
-                reply_markup=progress_btn()
-            )
-        except:
-            pass
+        p = int(c*100/t)
+        msg.edit_text(f"⬆ Uploading: {p}%")
 
-    try:
-        if ext.lower() in [".mp4",".mkv",".mov"]:
-            file.reply_video(
-                video=new,
-                caption=f"✅ {name}",
-                thumb=thumb if thumb and os.path.exists(thumb) else None,
-                supports_streaming=True,
-                progress=uprog
-            )
-        else:
-            file.reply_document(
-                document=new,
-                caption=f"✅ {name}",
-                thumb=thumb if thumb and os.path.exists(thumb) else None,
-                progress=uprog
-            )
+    ext = os.path.splitext(path)[1]
 
-        msg.delete()
-
-    except Exception as e:
-        msg.edit_text(f"❌ Upload Failed\n{str(e)}")
-
-    try:
-        if os.path.exists(new):
-            os.remove(new)
-    except:
-        pass
-
+    if ext == ".mp4":
+        file.reply_video(
+            path,
+            caption="✅ Done",
+            thumb=thumb if thumb and os.path.exists(thumb) else None,
+            supports_streaming=True,
+            progress=uprog
+        )
+    else:
+        file.reply_document(
+            path,
+            caption="✅ Done",
+            progress=uprog
+        )
 # ===== RUN =====
 if __name__ == "__main__":
 
