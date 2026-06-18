@@ -2,6 +2,9 @@ pyrogram==2.0.106
 tgcrypto
 pymongo
 aiofiles
-ffmpeg-python
 flask
 ffmpeg-python
+psutil
+pillow
+hachoir
+moviepy
