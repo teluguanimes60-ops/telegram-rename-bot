@@ -1,4 +1,4 @@
-# ===== AniToons Rename Bot (ULTRA FINAL VERSION) =====
+# ===== AniToons Rename Bot (ULTRA PREMIUM FINAL) =====
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -10,7 +10,7 @@ from flask import Flask
 
 # ===== SETTINGS =====
 CHANNEL_POST = "https://t.me/Anitoon_edit/33"
-WORKERS = 2
+WORKERS = 3
 
 # ===== FOLDERS =====
 os.makedirs("thumbs", exist_ok=True)
@@ -79,8 +79,8 @@ def bar(p):
 
 def progress_btn():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 AniToon's List", url=CHANNEL_POST)],
-        [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
+        [InlineKeyboardButton("📢 AniToon's Updates", url=CHANNEL_POST)],
+        [InlineKeyboardButton("❌ Cancel Task", callback_data="cancel")]
     ])
 
 def safe_edit(msg, text, btn=None):
@@ -116,16 +116,16 @@ def rename_menu(uid):
 
 def settings_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📌 Set Saved Name", callback_data="setname")],
-        [InlineKeyboardButton("🖼 Set Thumbnail", callback_data="thumb")],
+        [InlineKeyboardButton("📌 Saved Name", callback_data="setname")],
+        [InlineKeyboardButton("🖼 Thumbnail", callback_data="thumb")],
         [InlineKeyboardButton("🔙 Back", callback_data="back")]
     ])
 
 def video_menu():
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 Media Info", callback_data="info")],
         [InlineKeyboardButton("🎞 File → Video", callback_data="f2v")],
         [InlineKeyboardButton("📂 Video → File", callback_data="v2f")],
-        [InlineKeyboardButton("📊 Media Info", callback_data="info")],
         [InlineKeyboardButton("🔙 Back", callback_data="back")]
     ])
 
@@ -133,7 +133,7 @@ def video_menu():
 @app.on_message(filters.command("start"))
 def start(client, msg):
     msg.reply_text(
-        "🔥 **AniToons Rename Bot**\n\nSelect option:",
+        "🔥 **AniToons Rename Bot**\n\n✨ Ultra Fast • Smart Rename • Video Tools\n\nSelect option:",
         reply_markup=main_menu()
     )
 
@@ -146,10 +146,10 @@ def buttons(client, q):
     q.answer()
 
     if data == "rename":
-        safe_edit(q.message, "📁 Send your file", rename_menu(uid))
+        safe_edit(q.message, "📁 Send file to rename", rename_menu(uid))
 
     elif data == "video":
-        safe_edit(q.message, "🎬 Video Tools", video_menu())
+        safe_edit(q.message, "🎬 Send video/file for tools", video_menu())
 
     elif data == "settings":
         safe_edit(q.message, "⚙ Settings Panel", settings_menu())
@@ -188,38 +188,42 @@ def buttons(client, q):
         safe_edit(q.message, "❌ Task cancelled", main_menu())
 
     elif data == "info":
-        file = user_files.get(uid)
-        if not file:
-            safe_edit(q.message, "❌ Send file first")
-            return
-
-        size = round(file.document.file_size/(1024*1024),2) if file.document else 0
-        safe_edit(q.message, f"📊 File Size: {size} MB")
+        user_steps[uid] = "info"
+        safe_edit(q.message, "📊 Send file/video to get full info")
 
     elif data == "f2v":
         user_steps[uid] = "f2v"
-        safe_edit(q.message, "🎞 Send file to convert")
+        safe_edit(q.message, "🎞 Send file to convert to video")
 
     elif data == "v2f":
         user_steps[uid] = "v2f"
-        safe_edit(q.message, "📂 Send video to convert")
+        safe_edit(q.message, "📂 Send video to convert to file")
 
-# ===== FILE =====
+# ===== FILE HANDLER (FIXED FLOW) =====
 @app.on_message(filters.document | filters.video | filters.audio)
 def file_handler(client, msg):
 
-    if msg.document and msg.document.file_size > 2*1024*1024*1024:
-        msg.reply_text("❌ Max 2GB allowed")
+    uid = msg.from_user.id
+
+    # ===== VIDEO TOOL FLOW =====
+    if user_steps.get(uid) == "info":
+        file = msg.video or msg.document or msg.audio
+        size = round(file.file_size/(1024*1024),2)
+        duration = getattr(file, "duration", "Unknown")
+
+        msg.reply_text(
+            f"📊 **Media Info**\n\n📦 Size: {size} MB\n⏱ Duration: {duration}\n🎬 Type: {type(file).__name__}"
+        )
         return
 
-    uid = msg.from_user.id
+    # ===== NORMAL FLOW =====
     user_files[uid] = msg
 
     name = msg.document.file_name if msg.document else "file"
     sug = smart_name(os.path.splitext(name)[0])
 
     msg.reply_text(
-        f"💡 Suggested:\n`{sug}`",
+        f"✨ Suggested:\n`{sug}`",
         reply_markup=rename_menu(uid)
     )
 
@@ -242,9 +246,17 @@ def text_handler(client, msg):
 # ===== THUMB =====
 @app.on_message(filters.photo)
 def thumb(client, msg):
+
     uid = msg.from_user.id
+
+    if user_steps.get(uid) != "thumb":
+        return
+
     path = msg.download(f"thumbs/{uid}.jpg")
     set_user(uid, "thumb", path)
+
+    user_steps.pop(uid)
+
     msg.reply_text("✅ Thumbnail saved")
 
 # ===== WORKER =====
@@ -269,7 +281,7 @@ def process(file, name, msg):
     uid = file.from_user.id
     thumb = get_user(uid).get("thumb")
 
-    pmsg = msg.reply_text("⏳ Starting...", reply_markup=progress_btn())
+    pmsg = msg.reply_text("🚀 Processing...", reply_markup=progress_btn())
     start = time.time()
 
     def progress(c, t):
@@ -279,13 +291,21 @@ def process(file, name, msg):
 
         safe_edit(
             pmsg,
-            f"📥 Downloading\n[{bar(p)}] {p}%\n⚡ {round(speed/1024/1024,2)} MB/s\n⏳ {int(eta)} sec",
+            f"""🚀 Processing File
+
+[{bar(p)}] {p}%
+
+⚡ Speed: {round(speed/1024/1024,2)} MB/s
+🔥 Boost Mode: ~5MB/s
+
+⏳ ETA: {int(eta)} sec
+""",
             progress_btn()
         )
 
     path = file.download(progress=progress)
 
-    # VIDEO CONVERT
+    # ===== CONVERSION =====
     if user_steps.get(uid) == "f2v":
         new_path = "converted.mp4"
         subprocess.run(f'ffmpeg -i "{path}" "{new_path}"', shell=True)
@@ -302,7 +322,7 @@ def process(file, name, msg):
 
     def upload(c, t):
         p = int(c*100/t)
-        safe_edit(pmsg, f"📤 Uploading\n[{bar(p)}] {p}%", progress_btn())
+        safe_edit(pmsg, f"📤 Uploading...\n[{bar(p)}] {p}%", progress_btn())
 
     file.reply_document(
         new_file,
