@@ -41,7 +41,8 @@ user_file = {}
 saved_name = {}
 user_thumb_mode = {}
 user_saved_thumb = {}
-
+# ===== CANCEL SYSTEM =====
+cancel_task = {}
 # ===== UTILS =====
 def smart(name):
     name = re.sub(r'@\w+|\[.*?\]|\(.*?\)', '', name)
@@ -51,7 +52,11 @@ def smart(name):
 def progress_bar(p):
     return "█"*int(p/10) + "░"*(10-int(p/10))
 
-def progress_btn():
+def progress_btn(uid):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{uid}")],
+        [InlineKeyboardButton("📢 AniToon's List", url=CHANNEL)]
+    ])
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📢 AniToon's List", url=CHANNEL)]
     ])
@@ -111,8 +116,15 @@ def cb(_, q):
     if data == "rename":
         user_mode[uid] = "wait_file"
         q.message.reply_text("📤 Send File to Rename")
+        
+elif data == "auto":
+    user_mode[uid] = "rename_auto_thumb"
+    q.message.reply_text("🖼 Select Thumbnail", reply_markup=thumb_menu())
 
-    elif data == "auto":
+elif data == "manual":
+    user_mode[uid] = "rename_manual_thumb"
+    q.message.reply_text("🖼 Select Thumbnail", reply_markup=thumb_menu())
+
         file = user_file.get(uid)
         if file:
             name = smart(file.document.file_name if file.document else "file")
@@ -121,8 +133,16 @@ def cb(_, q):
     elif data == "manual":
         user_mode[uid] = "manual"
         q.message.reply_text("✏ Send new name")
+elif data == "saved":
+    if uid not in saved_name:
+        user_mode[uid] = "setname"
+        q.message.reply_text(
+            "❌ No saved name!\n\n✏ Send a name to save first."
+        )
+        return
 
-    elif data == "saved":
+    user_mode[uid] = "rename_saved_thumb"
+    q.message.reply_text("🖼 Select Thumbnail", reply_markup=thumb_menu())
         file = user_file.get(uid)
         name = saved_name.get(uid, "File")
         queue.put((file, name, uid, "rename"))
@@ -165,6 +185,11 @@ def cb(_, q):
             q.message.reply_photo(user_saved_thumb[uid])
         else:
             q.message.reply_text("❌ No Thumbnail Saved")
+
+elif data.startswith("cancel_"):
+    uid = int(data.split("_")[1])
+    cancel_task[uid] = True
+    q.message.reply_text("❌ Task Cancelled")
 
 # ===== FILE HANDLER =====
 @app.on_message(filters.document | filters.video | filters.audio)
