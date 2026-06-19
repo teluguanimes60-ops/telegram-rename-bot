@@ -112,6 +112,24 @@ def cb(_, q):
     uid = q.from_user.id
     data = q.data
 
+    elif data == "auto":
+    user_mode[uid] = "auto"
+    q.message.edit_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
+
+elif data == "manual":
+    user_mode[uid] = "manual"
+    q.message.edit_text("✏ Send new name")
+
+elif data == "saved":
+    if uid not in saved_name:
+        q.message.edit_text(
+            "❌ No saved name!\nGo to settings",
+            reply_markup=back_btn()
+        )
+        return
+    user_mode[uid] = "saved"
+    q.message.edit_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
+
     # ===== MAIN MENU =====
     if data == "back_main":
         q.message.edit_text(
@@ -178,8 +196,29 @@ def cb(_, q):
 def file(_, m):
     uid = m.from_user.id
 
-    # BULK
-if bulk_mode.get(uid):
+    # ===== BULK MODE =====
+    if bulk_mode.get(uid):
+        bulk_files.setdefault(uid, []).append(m)
+        m.reply_text(
+            f"📦 Added {len(bulk_files[uid])} files",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("▶ Start Bulk", callback_data="start_bulk")],
+                [InlineKeyboardButton("❌ Cancel Bulk", callback_data="cancel_bulk")]
+            ])
+        )
+        return
+
+    # ===== NORMAL =====
+    if user_mode.get(uid) == "wait_file":
+        user_file[uid] = m
+        m.reply_text("Choose option", reply_markup=rename_menu())
+    else:
+        queue.put((m, uid))
+
+    elif data.startswith("cancel_"):
+    cancel_task[uid] = True
+    q.message.edit_text("❌ Task Cancelled", reply_markup=main_menu())
+    
     bulk_files.setdefault(uid, []).append(m)
     m.reply_text(f"📦 Added {len(bulk_files[uid])} files\nClick 'Start Bulk'")
     return
@@ -189,6 +228,24 @@ if bulk_mode.get(uid):
         m.reply_text("Choose option", reply_markup=rename_menu())
     else:
         queue.put((m, uid))
+
+elif data == "start_bulk":
+    files = bulk_files.get(uid, [])
+    if not files:
+        q.answer("No files!", show_alert=True)
+        return
+
+    q.message.edit_text(f"🚀 Starting Bulk ({len(files)} files)")
+    
+    for f in files:
+        queue.put((f, uid))
+
+    bulk_files[uid] = []
+
+elif data == "cancel_bulk":
+    bulk_files[uid] = []
+    bulk_mode[uid] = False
+    q.message.edit_text("❌ Bulk Cancelled", reply_markup=main_menu())
 
 # ===== TEXT =====
 @app.on_message(filters.text & ~filters.command("start"))
@@ -227,6 +284,18 @@ def worker():
 # ===== PROCESS =====
 def process(file, uid, manual_name=None):
 
+    # ===== CONVERT FILE → VIDEO =====
+if user_mode.get(uid) == "f2v":
+    new_out = f"{OUTPUT}/{time.time()}.mp4"
+    subprocess.run([
+        "ffmpeg", "-i", path,
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-c:a", "aac",
+        new_out
+    ])
+    path = new_out
+    
     cancel_task[uid] = False
     msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn(uid))
 
@@ -237,7 +306,20 @@ def process(file, uid, manual_name=None):
         p = int(c*100/t)
         msg.edit_text(f"⬇ {bar(p)} {p}%", reply_markup=progress_btn(uid))
 
+try:
     path = file.download(file_name=f"{DOWNLOAD}/{time.time()}", progress=dprog)
+except:
+    msg.edit_text("❌ Cancelled")
+    return
+
+    try:
+    if ext in [".mp4",".mkv"]:
+        file.reply_video(...)
+    else:
+        file.reply_document(...)
+except:
+    msg.edit_text("❌ Cancelled Upload")
+    return
 
     name = manual_name or saved_name.get(uid) or smart(get_name(file))
 
