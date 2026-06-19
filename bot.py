@@ -65,12 +65,15 @@ def bar(p):
 # ===== UI =====
 def main_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📁 Rename", callback_data="rename"),
-         InlineKeyboardButton("🎬 Convert", callback_data="convert")],
-        [InlineKeyboardButton("📦 Bulk Mode", callback_data="bulk")],
-        [InlineKeyboardButton("⚡ Start Bulk", callback_data="start_bulk")],
-        [InlineKeyboardButton("⚙ Settings", callback_data="settings")],
+        [InlineKeyboardButton("📁 Rename", callback_data="menu_rename"),
+         InlineKeyboardButton("🎬 Convert", callback_data="menu_convert")],
+        [InlineKeyboardButton("⚙ Settings", callback_data="menu_settings")],
         [InlineKeyboardButton("📢 AniToon's List", url=CHANNEL)]
+    ])
+
+def back_btn():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
     ])
 
 def rename_menu():
@@ -96,89 +99,79 @@ def progress_btn(uid):
 # ===== START =====
 @app.on_message(filters.command("start"))
 def start(_, m):
-    m.reply_text("✨ AniToons Rename Bot\nFast ⚡ Powerful 🔥", reply_markup=main_menu())
+m.reply_text(
+    "✨ AniToons Rename Bot\n\nUse buttons 👇",
+    reply_markup=main_menu()
+)
 
 # ===== BUTTONS =====
 @app.on_callback_query()
 def cb(_, q):
+
     uid = q.from_user.id
     data = q.data
-    q.answer()
 
-    if data == "rename":
+    # ===== MAIN MENU =====
+    if data == "back_main":
+        q.message.edit_text(
+            "✨ AniToons Rename Bot\nChoose option 👇",
+            reply_markup=main_menu()
+        )
+
+    # ===== RENAME MENU =====
+    elif data == "menu_rename":
         user_mode[uid] = "wait_file"
-        q.message.reply_text("📤 Send File")
+        q.message.edit_text(
+            "📁 Send file to rename",
+            reply_markup=back_btn()
+        )
 
-    elif data == "start_bulk":
-
-    if uid not in bulk_files or len(bulk_files[uid]) == 0:
-        q.message.reply_text("❌ No files in bulk!")
-        return
-
-    q.message.reply_text(f"🚀 Starting Bulk for {len(bulk_files[uid])} files")
-
-    for f in bulk_files[uid]:
-        queue.put((f, uid))
-
-    bulk_files[uid] = []
-    bulk_mode[uid] = False
-        
-    elif data == "bulk":
-        bulk_mode[uid] = True
-        bulk_files[uid] = []
-        q.message.reply_text("📦 Bulk Mode ON\nSend multiple files")
-
-    elif data == "settings":
-        q.message.reply_text(
-            "⚙ Settings",
+    # ===== CONVERT MENU =====
+    elif data == "menu_convert":
+        q.message.edit_text(
+            "🎬 Choose convert type",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📌 Set Name", callback_data="setname")],
-                [InlineKeyboardButton("🖼 Set Thumb", callback_data="setthumb")]
+                [InlineKeyboardButton("📹 File → Video", callback_data="f2v")],
+                [InlineKeyboardButton("📁 Video → File", callback_data="v2f")],
+                [InlineKeyboardButton("🔙 Back", callback_data="back_main")]
             ])
         )
 
-    elif data == "setname":
-        user_mode[uid] = "setname"
-        q.message.reply_text("✏ Send Name")
+    # ===== FILE → VIDEO =====
+    elif data == "f2v":
+        user_mode[uid] = "f2v_thumb"
+        q.message.edit_text(
+            "🖼 Choose thumbnail",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🤖 Auto", callback_data="auto_thumb")],
+                [InlineKeyboardButton("🖼 Saved", callback_data="saved_thumb")],
+                [InlineKeyboardButton("🚫 No Thumb", callback_data="no_thumb")],
+                [InlineKeyboardButton("🔙 Back", callback_data="menu_convert")]
+            ])
+        )
 
-    elif data == "setthumb":
-        user_mode[uid] = "setthumb"
-        q.message.reply_text("📸 Send Thumbnail")
-
-    elif data == "auto":
-        user_mode[uid] = "auto_thumb"
-        q.message.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
-
-    elif data == "manual":
-        user_mode[uid] = "manual"
-        q.message.reply_text("✏ Send Name")
-
-    elif data == "saved":
-        if uid not in saved_name:
-            q.message.reply_text("❌ No saved name. Go settings.")
-            return
-        user_mode[uid] = "saved_thumb"
-        q.message.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
-
+    # ===== THUMB OPTIONS =====
     elif data == "auto_thumb":
         user_thumb_mode[uid] = "auto"
-        q.message.reply_text("📤 Send File")
+        user_mode[uid] = "f2v"
+        q.message.edit_text("📤 Send file now", reply_markup=back_btn())
 
     elif data == "saved_thumb":
         if uid not in user_saved_thumb:
-            q.message.reply_text("❌ Save thumbnail first")
+            user_mode[uid] = "setthumb"
+            q.message.edit_text(
+                "❌ No saved thumbnail!\n📸 Send thumbnail first",
+                reply_markup=back_btn()
+            )
         else:
             user_thumb_mode[uid] = "saved"
-            q.message.reply_text("📤 Send File")
+            user_mode[uid] = "f2v"
+            q.message.edit_text("📤 Send file now", reply_markup=back_btn())
 
     elif data == "no_thumb":
         user_thumb_mode[uid] = "none"
-        q.message.reply_text("📤 Send File")
-
-    elif data.startswith("cancel_"):
-        cancel_task[uid] = True
-        q.message.reply_text("❌ Cancelled")
-
+        user_mode[uid] = "f2v"
+        q.message.edit_text("📤 Send file now", reply_markup=back_btn())
 # ===== FILE =====
 @app.on_message(filters.document | filters.video | filters.audio)
 def file(_, m):
