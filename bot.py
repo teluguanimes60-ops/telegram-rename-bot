@@ -99,11 +99,12 @@ def progress_btn(uid):
 # ===== START =====
 @app.on_message(filters.command("start"))
 def start(_, m):
-m.reply_text(
-    "✨ AniToons Rename Bot\n\nUse buttons 👇",
-    reply_markup=main_menu()
-)
-
+    m.reply_text(
+        "✨ **AniToons Rename Bot**\n\n"
+        "⚡ Fast Rename\n🎬 Convert\n🖼 Thumbnail System\n\n"
+        "👇 Choose option",
+        reply_markup=main_menu()
+    )
 # ===== BUTTONS =====
 @app.on_callback_query()
 def cb(_, q):
