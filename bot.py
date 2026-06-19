@@ -104,6 +104,26 @@ def cb(_, q):
         user_mode[uid] = "wait_file"
         q.message.reply_text("📤 Send File")
 
+    elif data == "settings":
+    q.message.reply_text(
+        "⚙ Settings Panel\n\n"
+        "📌 Set Saved Name → Save default rename name\n"
+        "🖼 Set Thumbnail → Save custom thumbnail\n\n"
+        "👇 Choose option",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📌 Set Saved Name", callback_data="setname")],
+            [InlineKeyboardButton("🖼 Set Thumbnail", callback_data="setthumb")]
+        ])
+    )
+
+elif data == "setname":
+    user_mode[uid] = "setname"
+    q.message.reply_text("✏ Send the name to save")
+
+elif data == "setthumb":
+    user_mode[uid] = "setthumb"
+    q.message.reply_text("📸 Send thumbnail image")
+
     elif data == "auto":
         user_mode[uid] = "auto_thumb"
         q.message.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
@@ -112,11 +132,19 @@ def cb(_, q):
         user_mode[uid] = "manual_thumb"
         q.message.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
 
-    elif data == "saved":
-        if uid not in saved_name:
-            user_mode[uid] = "setname"
-            q.message.reply_text("❌ No saved name\nSend name now")
-            return
+elif data == "saved":
+    if uid not in saved_name:
+        user_mode[uid] = None
+        q.message.reply_text(
+            "❌ No saved name found!\n\n"
+            "👉 Go to ⚙ Settings\n"
+            "👉 Click 'Set Saved Name'\n"
+            "👉 Then try again"
+        )
+        return
+
+    user_mode[uid] = "saved_thumb"
+    q.message.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
         user_mode[uid] = "saved_thumb"
         q.message.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
 
