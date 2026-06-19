@@ -1,4 +1,4 @@
-# ===== AniToons Rename Bot (ULTRA VERSION) =====
+# ===== AniToons Rename Bot (ULTRA PRO MAX) =====
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -37,12 +37,18 @@ app = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 # ===== DATA =====
 queue = Queue()
+
 user_mode = {}
 user_file = {}
 saved_name = {}
 user_saved_thumb = {}
 user_thumb_mode = {}
 cancel_task = {}
+
+# 🔥 BULK + PREMIUM
+bulk_mode = {}
+bulk_files = {}
+premium_users = set()   # add user ids manually here
 
 # ===== UTILS =====
 def smart(name):
@@ -61,6 +67,7 @@ def main_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📁 Rename", callback_data="rename"),
          InlineKeyboardButton("🎬 Convert", callback_data="convert")],
+        [InlineKeyboardButton("📦 Bulk Mode", callback_data="bulk")],
         [InlineKeyboardButton("⚙ Settings", callback_data="settings")],
         [InlineKeyboardButton("📢 AniToon's List", url=CHANNEL)]
     ])
@@ -88,10 +95,7 @@ def progress_btn(uid):
 # ===== START =====
 @app.on_message(filters.command("start"))
 def start(_, m):
-    m.reply_text(
-        "✨ **AniToons Rename Bot**\n\nFast | Clean | Powerful",
-        reply_markup=main_menu()
-    )
+    m.reply_text("✨ AniToons Rename Bot\nFast ⚡ Powerful 🔥", reply_markup=main_menu())
 
 # ===== BUTTONS =====
 @app.on_callback_query()
@@ -104,47 +108,40 @@ def cb(_, q):
         user_mode[uid] = "wait_file"
         q.message.reply_text("📤 Send File")
 
+    elif data == "bulk":
+        bulk_mode[uid] = True
+        bulk_files[uid] = []
+        q.message.reply_text("📦 Bulk Mode ON\nSend multiple files")
+
     elif data == "settings":
-    q.message.reply_text(
-        "⚙ Settings Panel\n\n"
-        "📌 Set Saved Name → Save default rename name\n"
-        "🖼 Set Thumbnail → Save custom thumbnail\n\n"
-        "👇 Choose option",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📌 Set Saved Name", callback_data="setname")],
-            [InlineKeyboardButton("🖼 Set Thumbnail", callback_data="setthumb")]
-        ])
-    )
+        q.message.reply_text(
+            "⚙ Settings",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📌 Set Name", callback_data="setname")],
+                [InlineKeyboardButton("🖼 Set Thumb", callback_data="setthumb")]
+            ])
+        )
 
-elif data == "setname":
-    user_mode[uid] = "setname"
-    q.message.reply_text("✏ Send the name to save")
+    elif data == "setname":
+        user_mode[uid] = "setname"
+        q.message.reply_text("✏ Send Name")
 
-elif data == "setthumb":
-    user_mode[uid] = "setthumb"
-    q.message.reply_text("📸 Send thumbnail image")
+    elif data == "setthumb":
+        user_mode[uid] = "setthumb"
+        q.message.reply_text("📸 Send Thumbnail")
 
     elif data == "auto":
         user_mode[uid] = "auto_thumb"
         q.message.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
 
     elif data == "manual":
-        user_mode[uid] = "manual_thumb"
-        q.message.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
+        user_mode[uid] = "manual"
+        q.message.reply_text("✏ Send Name")
 
-elif data == "saved":
-    if uid not in saved_name:
-        user_mode[uid] = None
-        q.message.reply_text(
-            "❌ No saved name found!\n\n"
-            "👉 Go to ⚙ Settings\n"
-            "👉 Click 'Set Saved Name'\n"
-            "👉 Then try again"
-        )
-        return
-
-    user_mode[uid] = "saved_thumb"
-    q.message.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
+    elif data == "saved":
+        if uid not in saved_name:
+            q.message.reply_text("❌ No saved name. Go settings.")
+            return
         user_mode[uid] = "saved_thumb"
         q.message.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
 
@@ -154,8 +151,7 @@ elif data == "saved":
 
     elif data == "saved_thumb":
         if uid not in user_saved_thumb:
-            user_mode[uid] = "setthumb"
-            q.message.reply_text("❌ No thumb saved\nSend image")
+            q.message.reply_text("❌ Save thumbnail first")
         else:
             user_thumb_mode[uid] = "saved"
             q.message.reply_text("📤 Send File")
@@ -172,33 +168,35 @@ elif data == "saved":
 @app.on_message(filters.document | filters.video | filters.audio)
 def file(_, m):
     uid = m.from_user.id
-    mode = user_mode.get(uid)
 
-    if mode == "wait_file":
+    # BULK
+    if bulk_mode.get(uid):
+        bulk_files[uid].append(m)
+        m.reply_text(f"📦 Added {len(bulk_files[uid])} files")
+        return
+
+    if user_mode.get(uid) == "wait_file":
         user_file[uid] = m
         m.reply_text("Choose option", reply_markup=rename_menu())
-
     else:
-        queue.put((m, "process", uid))
+        queue.put((m, uid))
 
 # ===== TEXT =====
 @app.on_message(filters.text & ~filters.command("start"))
 def text(_, m):
     uid = m.from_user.id
 
-    if user_mode.get(uid) == "manual_thumb":
-        user_file[uid].text_name = m.text
-        m.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
+    if user_mode.get(uid) == "manual":
+        queue.put((user_file[uid], uid, m.text))
 
     elif user_mode.get(uid) == "setname":
         saved_name[uid] = m.text
-        m.reply_text("✅ Name Saved")
+        m.reply_text("✅ Saved")
 
 # ===== SAVE THUMB =====
 @app.on_message(filters.photo)
 def thumb(_, m):
     uid = m.from_user.id
-
     if user_mode.get(uid) == "setthumb":
         path = m.download(f"{THUMB}/{uid}.jpg")
         user_saved_thumb[uid] = path
@@ -207,48 +205,38 @@ def thumb(_, m):
 # ===== WORKER =====
 def worker():
     while True:
-        file, _, uid = queue.get()
+        data = queue.get()
         try:
-            process(file, uid)
+            if len(data) == 3:
+                process(data[0], data[1], data[2])
+            else:
+                process(data[0], data[1])
         except:
-            try:
-                file.reply_text("❌ Error")
-            except:
-                pass
+            pass
         queue.task_done()
 
 # ===== PROCESS =====
-def process(file, uid):
+def process(file, uid, manual_name=None):
 
     cancel_task[uid] = False
-
     msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn(uid))
+
     start = time.time()
 
     def dprog(c, t):
-        if cancel_task.get(uid):
-            raise Exception()
-
+        if cancel_task.get(uid): raise Exception()
         p = int(c*100/t)
-        speed = c/(time.time()-start+1)
-        eta = (t-c)/(speed+1)
-
-        msg.edit_text(
-            f"⬇ {bar(p)} {p}%\n⚡ {round(speed/1024/1024,2)} MB/s\n⏱ {int(eta)}s",
-            reply_markup=progress_btn(uid)
-        )
+        msg.edit_text(f"⬇ {bar(p)} {p}%", reply_markup=progress_btn(uid))
 
     path = file.download(file_name=f"{DOWNLOAD}/{time.time()}", progress=dprog)
 
-    msg.edit_text("⚙ Processing...", reply_markup=progress_btn(uid))
+    name = manual_name or saved_name.get(uid) or smart(get_name(file))
 
-    name = saved_name.get(uid) or smart(get_name(file))
     ext = os.path.splitext(path)[1]
     out = f"{OUTPUT}/{name}{ext}"
     os.rename(path, out)
 
     thumb = None
-
     if user_thumb_mode.get(uid) == "saved":
         thumb = user_saved_thumb.get(uid)
 
@@ -259,30 +247,14 @@ def process(file, uid):
     msg.edit_text("⬆ Uploading...", reply_markup=progress_btn(uid))
 
     def uprog(c, t):
-        if cancel_task.get(uid):
-            raise Exception()
-
+        if cancel_task.get(uid): raise Exception()
         p = int(c*100/t)
-        msg.edit_text(
-            f"⬆ {bar(p)} {p}%",
-            reply_markup=progress_btn(uid)
-        )
+        msg.edit_text(f"⬆ {bar(p)} {p}%", reply_markup=progress_btn(uid))
 
     if ext in [".mp4",".mkv"]:
-        file.reply_video(
-            out,
-            caption=f"✅ {name}",
-            thumb=thumb if thumb and os.path.exists(thumb) else None,
-            supports_streaming=True,
-            progress=uprog
-        )
+        file.reply_video(out, caption=name, thumb=thumb if thumb else None, supports_streaming=True, progress=uprog)
     else:
-        file.reply_document(out, caption=f"✅ {name}", progress=uprog)
-
-    try:
-        os.remove(out)
-    except:
-        pass
+        file.reply_document(out, caption=name, progress=uprog)
 
 # ===== RUN =====
 if __name__ == "__main__":
