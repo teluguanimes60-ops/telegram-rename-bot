@@ -68,6 +68,7 @@ def main_menu():
         [InlineKeyboardButton("📁 Rename", callback_data="rename"),
          InlineKeyboardButton("🎬 Convert", callback_data="convert")],
         [InlineKeyboardButton("📦 Bulk Mode", callback_data="bulk")],
+        [InlineKeyboardButton("⚡ Start Bulk", callback_data="start_bulk")],
         [InlineKeyboardButton("⚙ Settings", callback_data="settings")],
         [InlineKeyboardButton("📢 AniToon's List", url=CHANNEL)]
     ])
@@ -108,6 +109,20 @@ def cb(_, q):
         user_mode[uid] = "wait_file"
         q.message.reply_text("📤 Send File")
 
+    elif data == "start_bulk":
+
+    if uid not in bulk_files or len(bulk_files[uid]) == 0:
+        q.message.reply_text("❌ No files in bulk!")
+        return
+
+    q.message.reply_text(f"🚀 Starting Bulk for {len(bulk_files[uid])} files")
+
+    for f in bulk_files[uid]:
+        queue.put((f, uid))
+
+    bulk_files[uid] = []
+    bulk_mode[uid] = False
+        
     elif data == "bulk":
         bulk_mode[uid] = True
         bulk_files[uid] = []
@@ -170,10 +185,10 @@ def file(_, m):
     uid = m.from_user.id
 
     # BULK
-    if bulk_mode.get(uid):
-        bulk_files[uid].append(m)
-        m.reply_text(f"📦 Added {len(bulk_files[uid])} files")
-        return
+if bulk_mode.get(uid):
+    bulk_files.setdefault(uid, []).append(m)
+    m.reply_text(f"📦 Added {len(bulk_files[uid])} files\nClick 'Start Bulk'")
+    return
 
     if user_mode.get(uid) == "wait_file":
         user_file[uid] = m
