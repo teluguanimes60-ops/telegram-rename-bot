@@ -347,7 +347,22 @@ if mode == "ready":
     cleanup(out)
     out = new_out
     ext = ".mp4"
+    os.rename(path, out)
+    
+if user_action.get(uid) == "convert":
+    new_out = f"{OUTPUT}/{time.time()}.mp4"
 
+    subprocess.run([
+        "ffmpeg", "-i", out,
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-c:a", "aac",
+        new_out
+    ])
+
+    cleanup(out)
+    out = new_out
+    ext = ".mp4"
 
 # ===== THUMB (PUT HERE ONLY) =====
 thumb = None
