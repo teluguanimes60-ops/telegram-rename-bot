@@ -225,9 +225,9 @@ def cb(_, q):
         q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
 
     # ===== RENAME MENU =====
-    elif data == "menu_rename":
-        user_mode[uid] = "wait_file"
-        q.message.edit_text("📤 Send file to rename", reply_markup=back_main())
+elif data == "menu_rename":
+    user_mode[uid] = "rename_menu"
+    q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
 
     elif data == "rename_auto":
         user_mode[uid] = "rename_auto_thumb"
@@ -312,7 +312,10 @@ def cb(_, q):
     elif data == "thumb_auto":
         user_thumb_mode[uid] = "auto"
 
-        if "convert" in str(user_mode.get(uid)):
+if user_mode.get(uid) in ["convert_f2v"]:
+    user_mode[uid] = "convert_f2v"
+else:
+    user_mode[uid] = "rename_auto"
             user_mode[uid] = "convert_f2v"
         else:
             user_mode[uid] = "rename_auto"
@@ -350,6 +353,10 @@ def cb(_, q):
     elif data.startswith("cancel_"):
         cancel_task[uid] = True
         q.message.edit_text("❌ Task Cancelled", reply_markup=main_menu())
+
+if user_mode.get(uid) is None:
+        return
+    
 # ===== FILE HANDLER (MAIN ENGINE INPUT) =====
 
 @app.on_message(filters.document | filters.video | filters.audio)
@@ -369,16 +376,10 @@ def file_handler(_, m):
 
 mode = user_mode.get(uid)
 
-# 🚫 BLOCK if user didn't select anything
-if not mode:
-    m.reply_text("❌ First choose option from menu (/start)")
-    return
-
-# ===== WAIT FILE FOR RENAME =====
-if mode == "wait_file":
-    user_file[uid] = m
-    m.reply_text("⚙ Choose Rename Type", reply_markup=rename_menu())
-    return
+    # 🚫 BLOCK if user didn't select anything
+    if not mode:
+        m.reply_text("❌ First choose option from menu (/start)")
+        return
 
 # ===== VALID MODES ONLY =====
 allowed = [
@@ -393,6 +394,21 @@ if mode not in allowed:
     m.reply_text("❌ Complete previous step first")
     return
 
+# ===== RENAME FLOW =====
+    if mode in ["rename_auto", "rename_saved"]:
+        queue.put((m, uid))
+        return
+
+    if mode == "rename_manual":
+        user_file[uid] = m
+        m.reply_text("✏ Send new name")
+        return
+
+    # ===== CONVERT FLOW =====
+    if mode in ["convert_f2v", "convert_v2f"]:
+        queue.put((m, uid))
+        return
+        
 # ===== PROCESS =====
 if mode == "rename_manual":
     user_file[uid] = m
@@ -583,7 +599,7 @@ def process(file, uid, manual_name=None):
     os.rename(path, out)
 
     # ===== CONVERT =====
-    if user_mode.get(uid) == "f2v":
+    if user_mode.get(uid) == "convert_f2v":
         new_out = f"{OUTPUT}/{time.time()}.mp4"
 
         subprocess.run([
@@ -648,6 +664,9 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, "❌ Upload Cancelled")
         return
 
+    user_thumb_mode[uid] = None
+    user_mode[uid] = None
+    
     # ===== FINAL CLEAN =====
     cleanup(out)
     if thumb and "auto" in thumb:
