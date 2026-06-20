@@ -78,8 +78,10 @@ def cleanup(path):
 
 def smart(name):
     name = re.sub(r'@\w+|\[.*?\]|\(.*?\)', '', name)
+    name = re.sub(r'\d+$', '', name)  # ❌ remove ending numbers
     name = re.sub(r'[._\-]', ' ', name)
-    return re.sub(r'\s+', ' ', name).strip().title() or "File"
+    name = re.sub(r'\s+', ' ', name).strip()
+    return name.title() or "File"
 
 def get_name(f):
     if f.document:
@@ -193,9 +195,9 @@ def bulk_menu():
 
 def progress_btn(uid):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{uid}")]
+        [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{uid}")],
+        [InlineKeyboardButton("📢 AniToon's List", url=CHANNEL)]
     ])
-
 
 # ===== START MESSAGE =====
 
@@ -533,14 +535,23 @@ def process(file, uid, manual_name=None):
     if user_thumb_mode.get(uid) == "saved":
         thumb = user_saved_thumb.get(uid)
 
-    elif user_thumb_mode.get(uid) == "auto":
-        thumb = f"{THUMB}/{time.time()}.jpg"
+elif user_thumb_mode.get(uid) == "auto":
+    thumb = f"{THUMB}/{time.time()}.jpg"
+
+    try:
         subprocess.run([
-            "ffmpeg", "-i", out,
-            "-ss", "2",
+            "ffmpeg", "-y",
+            "-i", out,
+            "-ss", "00:00:02",
             "-vframes", "1",
             thumb
-        ])
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        if not os.path.exists(thumb):
+            thumb = None
+
+    except:
+        thumb = None
 
     # ===== UPLOAD =====
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
