@@ -331,14 +331,51 @@ if mode == "ready":
         m.reply_text("✏ Send new name")
         return
 
-    # ===== CONVERT =====
-    if mode in ["convert_f2v", "convert_v2f"]:
-        queue.put((m, uid))
-        return
+os.rename(path, out)
 
-    # ❌ FALLBACK
-    m.reply_text("❌ Invalid step, press /start again")
+# ===== CONVERT =====
+if user_action.get(uid) == "convert":
+    new_out = f"{OUTPUT}/{time.time()}.mp4"
 
+    subprocess.run([
+        "ffmpeg", "-i", out,
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-c:a", "aac",
+        new_out
+    ])
+
+    cleanup(out)
+    out = new_out
+    ext = ".mp4"
+
+
+# ===== THUMB (PUT HERE ONLY) =====
+thumb = None
+mode_thumb = user_thumb_mode.get(uid)
+
+if mode_thumb == "saved":
+    thumb = user_saved_thumb.get(uid)
+
+elif mode_thumb == "auto":
+    thumb = f"{THUMB}/{time.time()}.jpg"
+    try:
+        subprocess.run([
+            "ffmpeg",
+            "-i", out,
+            "-ss", "00:00:01",
+            "-vframes", "1",
+            "-vf", "scale=320:320",
+            "-q:v", "2",
+            thumb
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        if not os.path.exists(thumb):
+            thumb = None
+
+    except Exception as e:
+        print("Thumbnail error:", e)
+        thumb = None
 # ===== TEXT HANDLER =====
 
 @app.on_message(filters.text & ~filters.command("start"))
@@ -365,7 +402,7 @@ def text_handler(_, m):
     # ===== SET SAVED NAME =====
     if mode == "set_name":
         saved_name[uid] = m.text
-        user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
+user_mode[uid] = None
 
         m.reply_text("✅ Saved Name Updated", reply_markup=main_menu())
         return
