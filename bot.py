@@ -286,7 +286,11 @@ def file_handler(_, m):
         return
         
     uid = m.from_user.id
-    mode = user_mode.get(uid)
+mode = user_mode.get(uid)
+
+if mode == "ready":
+    queue.put((m, uid))
+    return
 
     # 🚫 BLOCK if user didn't press buttons
     if not mode:
@@ -315,7 +319,7 @@ def file_handler(_, m):
         m.reply_text("✏ Send new name")
         return
 
-os.rename(path, out)
+
 
 # ===== CONVERT =====
 if user_action.get(uid) == "convert":
@@ -545,7 +549,7 @@ def process(file, uid, manual_name=None):
     ext = os.path.splitext(path)[1]
     out = f"{OUTPUT}/{name}{ext}"
 
-os.rename(path, out)
+
 
     # ===== CONVERT (PUT HERE EXACTLY) =====
     if user_action.get(uid) == "convert":
@@ -578,22 +582,7 @@ if user_action.get(uid) == "convert":
     cleanup(out)
     out = new_out
     ext = ".mp4"
-    
-    thumb = f"{THUMB}/{time.time()}.jpg"
-    try:
-        subprocess.run([
-            "ffmpeg", "-i", out,
-            "-ss", "1",
-            "-vframes", "1",
-            "-vf", "scale=320:320",
-            "-q:v", "2",
-            thumb
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        if not os.path.exists(thumb):
-            thumb = None
-    except:
-        thumb = None
 # ===== THUMB =====
  
     thumb = f"{THUMB}/{time.time()}.jpg"
