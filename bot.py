@@ -192,6 +192,7 @@ def bulk_menu():
             InlineKeyboardButton("🔙 Back", callback_data="back_main")
         ]
     ])
+    
 def progress_btn(uid):
     return InlineKeyboardMarkup([
         [
@@ -200,8 +201,6 @@ def progress_btn(uid):
         [
             InlineKeyboardButton("📢 Channel", url=CHANNEL)
         ]
-    ])
-        [InlineKeyboardButton("📢 AniToon's List", url=CHANNEL)]
     ])
 
 # ===== START MESSAGE =====
@@ -509,10 +508,10 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, "❌ Cancelled")
         return
 
-    # ===== NAME =====
-name = manual_name or saved_name.get(uid) or smart(get_name(file))
-name = re.sub(r'\d+$', '', name).strip()
-
+# ===== NAME =====
+    name = manual_name or saved_name.get(uid) or smart(get_name(file))
+    name = re.sub(r'\d+$', '', name).strip()
+    
     ext = os.path.splitext(path)[1]
     out = f"{OUTPUT}/{name}{ext}"
 
@@ -535,30 +534,28 @@ name = re.sub(r'\d+$', '', name).strip()
         out = new_out
         ext = ".mp4"
 
-    # ===== THUMB =====
 # ===== THUMB =====
-thumb = None
+    thumb = None
 
-mode_thumb = user_thumb_mode.get(uid)
+    mode_thumb = user_thumb_mode.get(uid)
 
-if mode_thumb == "saved":
-    thumb = user_saved_thumb.get(uid)
+    if mode_thumb == "saved":
+        thumb = user_saved_thumb.get(uid)
 
-if mode_thumb == "auto":
-    thumb = f"{THUMB}/{time.time()}.jpg"
-    subprocess.run([
-        "ffmpeg", "-i", out,
-        "-ss", "2",
-        "-vframes", "1",
-        thumb
-    ]), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    elif mode_thumb == "auto":
+        thumb = f"{THUMB}/{time.time()}.jpg"
+        try:
+            subprocess.run([
+                "ffmpeg", "-i", out,
+                "-ss", "2",
+                "-vframes", "1",
+                thumb
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        if not os.path.exists(thumb):
+            if not os.path.exists(thumb):
+                thumb = None
+        except:
             thumb = None
-
-    except:
-        thumb = None
-
     # ===== UPLOAD =====
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
