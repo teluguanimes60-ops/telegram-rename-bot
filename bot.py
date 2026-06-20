@@ -226,8 +226,6 @@ def start(_, m):
     )
 
 # ===== BUTTON HANDLER (ADVANCED UI FLOW) =====
-@app.on_callback_query()
-def cb(_, q):
 
     uid = q.from_user.id
     data = q.data
@@ -235,7 +233,7 @@ def cb(_, q):
 
     # ===== MAIN =====
     if data == "back_main":
-        user_mode[uid] = None
+        user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
         q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
 
     # ===== RENAME MENU =====
@@ -247,65 +245,53 @@ def cb(_, q):
     q.answer()
 
     if data == "back_main":
-        user_mode[uid] = None
+        user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
         q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
 
     elif data == "menu_rename":
-        user_mode[uid] = "rename_menu"
         q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
 
     elif data == "rename_auto":
         user_action[uid] = "rename"
         user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu("menu_rename"))
+        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
 
     elif data == "rename_manual":
         user_mode[uid] = "rename_manual"
         q.message.edit_text("✏ Send new file name")
 
     elif data == "rename_saved":
-        if uid not in saved_name:
-            q.message.edit_text("❌ No saved name!", reply_markup=back_main())
-        else:
-            user_action[uid] = "rename"
-            user_mode[uid] = "thumb"
-            q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu("menu_rename"))
-
-    elif data == "menu_convert":
-        q.message.edit_text("🎬 Convert Options", reply_markup=convert_menu())
+        user_action[uid] = "rename"
+        user_mode[uid] = "thumb"
+        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
 
     elif data == "convert_f2v":
         user_action[uid] = "convert"
         user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu("menu_convert"))
-
-    elif data == "convert_v2f":
-        user_action[uid] = "convert"
-        user_mode[uid] = "ready"
-        q.message.edit_text("📤 Send video", reply_markup=back_main())
+        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
 
     elif data == "thumb_auto":
         user_thumb_mode[uid] = "auto"
         user_mode[uid] = "ready"
-        q.message.edit_text("📤 Send file", reply_markup=back_main())
+        q.message.edit_text("📤 Send file")
 
     elif data == "thumb_saved":
         if uid not in user_saved_thumb:
             user_mode[uid] = "set_thumb"
-            q.message.edit_text("❌ Send thumbnail first", reply_markup=back_main())
+            q.message.edit_text("❌ Send thumbnail first")
         else:
             user_thumb_mode[uid] = "saved"
             user_mode[uid] = "ready"
-            q.message.edit_text("📤 Send file", reply_markup=back_main())
+            q.message.edit_text("📤 Send file")
 
     elif data == "thumb_none":
         user_thumb_mode[uid] = "none"
         user_mode[uid] = "ready"
-        q.message.edit_text("📤 Send file", reply_markup=back_main())
+        q.message.edit_text("📤 Send file")
 
     elif data.startswith("cancel_"):
         cancel_task[uid] = True
-        q.message.edit_text("❌ Cancelled", reply_markup=main_menu())
+        q.message.edit_text("❌ Cancelled")
 # ===== FILE HANDLER (FIXED FINAL) =====
 
 @app.on_message(filters.document | filters.video | filters.audio)
@@ -339,7 +325,6 @@ def file_handler(_, m):
 if mode == "ready":
     queue.put((m, uid))
     return
-
     # ===== MANUAL RENAME =====
     if mode == "rename_manual":
         user_file[uid] = m
@@ -380,7 +365,7 @@ def text_handler(_, m):
     # ===== SET SAVED NAME =====
     if mode == "set_name":
         saved_name[uid] = m.text
-        user_mode[uid] = None
+        user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
 
         m.reply_text("✅ Saved Name Updated", reply_markup=main_menu())
         return
@@ -397,7 +382,7 @@ def photo_handler(_, m):
     if user_mode.get(uid) == "set_thumb":
         path = m.download(f"{THUMB}/{uid}.jpg")
         user_saved_thumb[uid] = path
-        user_mode[uid] = None
+        user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
 
         m.reply_text("✅ Thumbnail Saved", reply_markup=main_menu())
         return
@@ -420,7 +405,7 @@ def bulk_cleanup(uid):
 # ===== AUTO RESET USER STATE =====
 
 def reset_user(uid):
-    user_mode[uid] = None
+    user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
     user_file.pop(uid, None)
     manual_name.pop(uid, None)
 
@@ -527,7 +512,45 @@ def process(file, uid, manual_name=None):
     os.rename(path, out)
 
     # ===== CONVERT =====
-elif mode_thumb == "auto":
+if user_action.get(uid) == "convert":
+    new_out = f"{OUTPUT}/{time.time()}.mp4"
+
+    subprocess.run([
+        "ffmpeg", "-i", out,
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-c:a", "aac",
+        new_out
+    ])
+
+    cleanup(out)
+    out = new_out
+    ext = ".mp4"
+
+# ===== THUMB =====
+thumb = None
+mode_thumb = user_thumb_mode.get(uid)
+
+if mode_thumb == "saved":
+    thumb = user_saved_thumb.get(uid)
+
+
+    thumb = f"{THUMB}/{time.time()}.jpg"
+
+    subprocess.run([
+        "ffmpeg", "-i", out,
+        "-ss", "00:00:01",
+        "-vframes", "1",
+        "-vf", "scale=320:320",
+        "-q:v", "2",
+        thumb
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    if not os.path.exists(thumb):
+        thumb = None
+        
+    # ===== CONVERT =====
+
     thumb = f"{THUMB}/{time.time()}.jpg"
     try:
         subprocess.run([
@@ -544,7 +567,7 @@ elif mode_thumb == "auto":
     except:
         thumb = None
 # ===== THUMB =====
- elif mode_thumb == "auto":
+ 
     thumb = f"{THUMB}/{time.time()}.jpg"
 
     try:
@@ -598,9 +621,10 @@ elif mode_thumb == "auto":
         safe_edit(msg, "❌ Upload Cancelled")
         return
 
-    user_thumb_mode[uid] = None
-    user_mode[uid] = None
-    
+    user_thumb_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
+    user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
+
+user_action = {}   # 🔥 ADD THIS LINE
     # ===== FINAL CLEAN =====
     cleanup(out)
     if thumb and "auto" in thumb:
