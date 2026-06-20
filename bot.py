@@ -348,6 +348,21 @@ if user_action.get(uid) == "convert":
     cleanup(out)
     out = new_out
     ext = ".mp4"
+    
+    if user_action.get(uid) == "convert":
+    new_out = f"{OUTPUT}/{time.time()}.mp4"
+
+    subprocess.run([
+        "ffmpeg", "-i", out,
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-c:a", "aac",
+        new_out
+    ])
+
+    cleanup(out)
+    out = new_out
+    ext = ".mp4"
 
 
 # ===== THUMB (PUT HERE ONLY) =====
@@ -563,7 +578,7 @@ if user_action.get(uid) == "convert":
     cleanup(out)
     out = new_out
     ext = ".mp4"
-    
+
 # ===== THUMB =====
 thumb = None
 mode_thumb = user_thumb_mode.get(uid)
