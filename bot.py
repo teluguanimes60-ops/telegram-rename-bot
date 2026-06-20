@@ -286,38 +286,20 @@ def cb(_, q):
 def file_handler(_, m):
 
     uid = m.from_user.id
+    mode = user_mode.get(uid)
 
-    # ===== BULK MODE =====
+    # 🚫 BLOCK if no button selected
+    if not mode:
+        m.reply_text("❌ First choose option using /start")
+        return
+
+    # ===== BULK =====
     if bulk_mode.get(uid):
         bulk_files.setdefault(uid, []).append(m)
-
-        m.reply_text(
-            f"📦 File Added\nTotal Files: {len(bulk_files[uid])}",
-            reply_markup=bulk_menu()
-        )
+        m.reply_text(f"📦 Added ({len(bulk_files[uid])})", reply_markup=bulk_menu())
         return
 
-mode = user_mode.get(uid)
-
-    # 🚫 BLOCK if user didn't select anything
-    if not mode:
-        m.reply_text("❌ First choose option from menu (/start)")
-        return
-
-# ===== VALID MODES ONLY =====
-allowed = [
-    "rename_auto",
-    "rename_saved",
-    "rename_manual",
-    "convert_f2v",
-    "convert_v2f"
-]
-
-if mode not in allowed:
-    m.reply_text("❌ Complete previous step first")
-    return
-
-# ===== RENAME FLOW =====
+    # ===== RENAME =====
     if mode in ["rename_auto", "rename_saved"]:
         queue.put((m, uid))
         return
@@ -327,19 +309,13 @@ if mode not in allowed:
         m.reply_text("✏ Send new name")
         return
 
-    # ===== CONVERT FLOW =====
+    # ===== CONVERT =====
     if mode in ["convert_f2v", "convert_v2f"]:
         queue.put((m, uid))
         return
-        
-# ===== PROCESS =====
-if mode == "rename_manual":
-    user_file[uid] = m
-    m.reply_text("✏ Send new name")
-else:
-    queue.put((m, uid))
 
-
+    # ❌ WRONG STATE
+    m.reply_text("❌ Complete previous step first")
 # ===== TEXT HANDLER =====
 
 @app.on_message(filters.text & ~filters.command("start"))
