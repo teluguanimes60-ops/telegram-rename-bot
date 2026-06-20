@@ -367,42 +367,38 @@ def file_handler(_, m):
         )
         return
 
-    mode = user_mode.get(uid)
+mode = user_mode.get(uid)
 
-    # ===== WAIT FILE FOR RENAME =====
-    if mode == "wait_file":
-        user_file[uid] = m
-        m.reply_text("⚙ Choose Rename Type", reply_markup=rename_menu())
-        return
+# 🚫 BLOCK if user didn't select anything
+if not mode:
+    m.reply_text("❌ First choose option from menu (/start)")
+    return
 
-    # ===== AUTO RENAME =====
-    if mode == "rename_auto":
-        queue.put((m, uid))
-        return
+# ===== WAIT FILE FOR RENAME =====
+if mode == "wait_file":
+    user_file[uid] = m
+    m.reply_text("⚙ Choose Rename Type", reply_markup=rename_menu())
+    return
 
-    # ===== SAVED RENAME =====
-    if mode == "rename_saved":
-        queue.put((m, uid))
-        return
+# ===== VALID MODES ONLY =====
+allowed = [
+    "rename_auto",
+    "rename_saved",
+    "rename_manual",
+    "convert_f2v",
+    "convert_v2f"
+]
 
-    # ===== MANUAL RENAME =====
-    if mode == "rename_manual":
-        user_file[uid] = m
-        m.reply_text("✏ Send new name")
-        return
+if mode not in allowed:
+    m.reply_text("❌ Complete previous step first")
+    return
 
-    # ===== CONVERT FILE → VIDEO =====
-    if mode == "convert_f2v":
-        queue.put((m, uid))
-        return
-
-    # ===== CONVERT VIDEO → FILE =====
-    if mode == "convert_v2f":
-        queue.put((m, uid))
-        return
-
-    # ===== DEFAULT =====
-    m.reply_text("❌ Choose option first using /start")
+# ===== PROCESS =====
+if mode == "rename_manual":
+    user_file[uid] = m
+    m.reply_text("✏ Send new name")
+else:
+    queue.put((m, uid))
 
 
 # ===== TEXT HANDLER =====
