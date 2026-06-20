@@ -8,3 +8,5 @@ psutil
 pillow
 hachoir
 moviepy
+apt install ffmpeg
+ffmpeg required
