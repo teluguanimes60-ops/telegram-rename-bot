@@ -213,27 +213,10 @@ def start(_, m):
         "👇 Choose option",
         reply_markup=main_menu()
     )
-@app.on_message(filters.command("start"))
-def start(_, m):
-    m.reply_text(
-        "✨ **AniToons Ultra Bot**\n\n"
-        "⚡ Rename Files\n"
-        "🎬 Convert Video\n"
-        "📦 Bulk System\n"
-        "🖼 Thumbnail Control\n\n"
-        "👇 Choose option",
-        reply_markup=main_menu()
-    )
-
-# ===== BUTTON HANDLER (ADVANCED UI FLOW) =====
-
-    uid = q.from_user.id
-    data = q.data
-    q.answer()
 
     # ===== MAIN =====
     if data == "back_main":
-        user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
+        user_mode[uid] = None
         q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
 
     # ===== RENAME MENU =====
@@ -245,7 +228,7 @@ def cb(_, q):
     q.answer()
 
     if data == "back_main":
-        user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
+user_mode[uid] = None
         q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
 
     elif data == "menu_rename":
@@ -411,7 +394,7 @@ def text_handler(_, m):
     if mode == "rename_manual_thumb":
         if uid in user_file:
             queue.put((user_file[uid], uid, manual_name.get(uid)))
-            [uid] = None
+    user_mode[uid] = None
         return
 
     # ===== SET SAVED NAME =====
@@ -434,7 +417,7 @@ def photo_handler(_, m):
     if user_mode.get(uid) == "set_thumb":
         path = m.download(f"{THUMB}/{uid}.jpg")
         user_saved_thumb[uid] = path
-        user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
+user_mode[uid] = None
 
         m.reply_text("✅ Thumbnail Saved", reply_markup=main_menu())
         return
@@ -457,7 +440,7 @@ def bulk_cleanup(uid):
 # ===== AUTO RESET USER STATE =====
 
 def reset_user(uid):
-    user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
+user_mode[uid] = None
     user_file.pop(uid, None)
     manual_name.pop(uid, None)
 
@@ -578,35 +561,7 @@ if user_action.get(uid) == "convert":
     cleanup(out)
     out = new_out
     ext = ".mp4"
-
-# ===== THUMB =====
-thumb = None
-mode_thumb = user_thumb_mode.get(uid)
-
-if mode_thumb == "saved":
-    thumb = user_saved_thumb.get(uid)
-
-elif mode_thumb == "auto":
-    thumb = f"{THUMB}/{time.time()}.jpg"
-    try:
-        subprocess.run([
-            "ffmpeg",
-            "-i", out,
-            "-ss", "00:00:01",
-            "-vframes", "1",
-            "-vf", "scale=320:320",
-            "-q:v", "2",
-            thumb
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        if not os.path.exists(thumb):
-            thumb = None
-
-    except Exception as e:
-        print("Thumbnail error:", e)
-        thumb = None
-    # ===== CONVERT =====
-
+    
     thumb = f"{THUMB}/{time.time()}.jpg"
     try:
         subprocess.run([
@@ -644,6 +599,7 @@ elif mode_thumb == "auto":
         print("Thumbnail error:", e)
         thumb = None
     # ===== UPLOAD =====
+user_action = {}   # 🔥 ADD THIS LINE
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
     def uprog(c, t):
@@ -677,10 +633,8 @@ elif mode_thumb == "auto":
         safe_edit(msg, "❌ Upload Cancelled")
         return
 
-    user_thumb_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
-    user_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_modeuser_mode[uid] = None
+user_mode[uid] = None
 
-user_action = {}   # 🔥 ADD THIS LINE
     # ===== FINAL CLEAN =====
     cleanup(out)
     if thumb and "auto" in thumb:
