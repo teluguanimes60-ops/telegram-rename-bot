@@ -192,10 +192,15 @@ def bulk_menu():
             InlineKeyboardButton("🔙 Back", callback_data="back_main")
         ]
     ])
-
 def progress_btn(uid):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{uid}")],
+        [
+            InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{uid}")
+        ],
+        [
+            InlineKeyboardButton("📢 Channel", url=CHANNEL)
+        ]
+    ])
         [InlineKeyboardButton("📢 AniToon's List", url=CHANNEL)]
     ])
 
@@ -505,7 +510,8 @@ def process(file, uid, manual_name=None):
         return
 
     # ===== NAME =====
-    name = manual_name or saved_name.get(uid) or smart(get_name(file))
+name = manual_name or saved_name.get(uid) or smart(get_name(file))
+name = re.sub(r'\d+$', '', name).strip()
 
     ext = os.path.splitext(path)[1]
     out = f"{OUTPUT}/{name}{ext}"
@@ -530,22 +536,22 @@ def process(file, uid, manual_name=None):
         ext = ".mp4"
 
     # ===== THUMB =====
-    thumb = None
+# ===== THUMB =====
+thumb = None
 
-    if user_thumb_mode.get(uid) == "saved":
-        thumb = user_saved_thumb.get(uid)
+mode_thumb = user_thumb_mode.get(uid)
 
-elif user_thumb_mode.get(uid) == "auto":
+if mode_thumb == "saved":
+    thumb = user_saved_thumb.get(uid)
+
+if mode_thumb == "auto":
     thumb = f"{THUMB}/{time.time()}.jpg"
-
-    try:
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-i", out,
-            "-ss", "00:00:02",
-            "-vframes", "1",
-            thumb
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([
+        "ffmpeg", "-i", out,
+        "-ss", "2",
+        "-vframes", "1",
+        thumb
+    ]), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         if not os.path.exists(thumb):
             thumb = None
