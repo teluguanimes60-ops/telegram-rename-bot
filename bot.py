@@ -211,7 +211,6 @@ def start(_, m):
         reply_markup=main_menu()
     )
     # ===== BUTTON HANDLER (ADVANCED UI FLOW) =====
-
 @app.on_callback_query()
 def cb(_, q):
 
@@ -225,9 +224,9 @@ def cb(_, q):
         q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
 
     # ===== RENAME MENU =====
-elif data == "menu_rename":
-    user_mode[uid] = "rename_menu"
-    q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
+    elif data == "menu_rename":
+        user_mode[uid] = "rename_menu"
+        q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
 
     elif data == "rename_auto":
         user_mode[uid] = "rename_auto_thumb"
@@ -239,16 +238,12 @@ elif data == "menu_rename":
 
     elif data == "rename_saved":
         if uid not in saved_name:
-            q.message.edit_text(
-                "❌ No saved name found!\n\n"
-                "👉 Go to Settings\n👉 Set Saved Name",
-                reply_markup=back_main()
-            )
+            q.message.edit_text("❌ No saved name!\nGo to settings", reply_markup=back_main())
         else:
             user_mode[uid] = "rename_saved_thumb"
             q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu("menu_rename"))
 
-    # ===== CONVERT MENU =====
+    # ===== CONVERT =====
     elif data == "menu_convert":
         q.message.edit_text("🎬 Convert Options", reply_markup=convert_menu())
 
@@ -258,104 +253,32 @@ elif data == "menu_rename":
 
     elif data == "convert_v2f":
         user_mode[uid] = "convert_v2f"
-        q.message.edit_text("📤 Send video to convert into file", reply_markup=back_main())
+        q.message.edit_text("📤 Send video", reply_markup=back_main())
 
-    # ===== BULK MODE =====
-    elif data == "menu_bulk":
-        bulk_mode[uid] = True
-        bulk_files[uid] = []
-        q.message.edit_text(
-            "📦 Bulk Mode Enabled\n\n📤 Send multiple files",
-            reply_markup=bulk_menu()
-        )
-
-    elif data == "start_bulk":
-        files = bulk_files.get(uid, [])
-
-        if not files:
-            q.answer("No files added!", show_alert=True)
-            return
-
-        q.message.edit_text(f"🚀 Processing {len(files)} files...")
-
-        for f in files:
-            queue.put((f, uid))
-
-        bulk_files[uid] = []
-
-    elif data == "cancel_bulk":
-        bulk_mode[uid] = False
-        bulk_files[uid] = []
-        q.message.edit_text("❌ Bulk Cancelled", reply_markup=main_menu())
-
-    # ===== SETTINGS =====
-    elif data == "menu_settings":
-        q.message.edit_text("⚙ Settings Panel", reply_markup=settings_menu())
-
-    elif data == "set_name":
-        user_mode[uid] = "set_name"
-        q.message.edit_text("✏ Send name to save", reply_markup=back_main())
-
-    elif data == "set_thumb":
-        user_mode[uid] = "set_thumb"
-        q.message.edit_text("📸 Send thumbnail image", reply_markup=back_main())
-
-    elif data == "view_thumb":
-        thumb = user_saved_thumb.get(uid)
-
-        if thumb and os.path.exists(thumb):
-            q.message.reply_photo(thumb, caption="🖼 Your Saved Thumbnail")
-        else:
-            q.message.reply_text("❌ No thumbnail saved")
-
-    # ===== THUMB OPTIONS =====
+    # ===== THUMB =====
     elif data == "thumb_auto":
         user_thumb_mode[uid] = "auto"
-
-if user_mode.get(uid) in ["convert_f2v"]:
-    user_mode[uid] = "convert_f2v"
-else:
-    user_mode[uid] = "rename_auto"
-            user_mode[uid] = "convert_f2v"
-        else:
-            user_mode[uid] = "rename_auto"
-
+        user_mode[uid] = "convert_f2v" if "convert" in str(user_mode.get(uid)) else "rename_auto"
         q.message.edit_text("📤 Send file", reply_markup=back_main())
 
     elif data == "thumb_saved":
         if uid not in user_saved_thumb:
             user_mode[uid] = "set_thumb"
-            q.message.edit_text(
-                "❌ No saved thumbnail!\n\n📸 Send thumbnail first",
-                reply_markup=back_main()
-            )
+            q.message.edit_text("❌ Send thumbnail first", reply_markup=back_main())
         else:
             user_thumb_mode[uid] = "saved"
-
-            if "convert" in str(user_mode.get(uid)):
-                user_mode[uid] = "convert_f2v"
-            else:
-                user_mode[uid] = "rename_auto"
-
+            user_mode[uid] = "convert_f2v" if "convert" in str(user_mode.get(uid)) else "rename_auto"
             q.message.edit_text("📤 Send file", reply_markup=back_main())
 
     elif data == "thumb_none":
         user_thumb_mode[uid] = "none"
-
-        if "convert" in str(user_mode.get(uid)):
-            user_mode[uid] = "convert_f2v"
-        else:
-            user_mode[uid] = "rename_auto"
-
+        user_mode[uid] = "convert_f2v" if "convert" in str(user_mode.get(uid)) else "rename_auto"
         q.message.edit_text("📤 Send file", reply_markup=back_main())
 
     # ===== CANCEL =====
     elif data.startswith("cancel_"):
         cancel_task[uid] = True
-        q.message.edit_text("❌ Task Cancelled", reply_markup=main_menu())
-
-if user_mode.get(uid) is None:
-        return
+        q.message.edit_text("❌ Cancelled", reply_markup=main_menu())
     
 # ===== FILE HANDLER (MAIN ENGINE INPUT) =====
 
