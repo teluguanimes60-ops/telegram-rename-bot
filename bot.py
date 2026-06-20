@@ -280,6 +280,31 @@ user_mode[uid] = None
 @app.on_message(filters.document | filters.video | filters.audio)
 def file_handler(_, m):
 
+    uid = m.from_user.id
+    mode = user_mode.get(uid)
+
+    if mode == "ready":
+        queue.put((m, uid))
+        return
+
+    if not mode:
+        m.reply_text("❌ First select option from menu (/start)")
+        return
+
+    if bulk_mode.get(uid):
+        bulk_files.setdefault(uid, []).append(m)
+        m.reply_text(f"📦 File Added ({len(bulk_files[uid])})", reply_markup=bulk_menu())
+        return
+
+    if mode == "rename_manual":
+        user_file[uid] = m
+        m.reply_text("✏ Send new name")
+        return
+
+if data == "back_main":
+    user_mode[uid] = None
+    q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
+
     # ===== RENAME AUTO / SAVED =====
     if mode == "ready":
         queue.put((m, uid))
@@ -597,7 +622,6 @@ if user_action.get(uid) == "convert":
         print("Thumbnail error:", e)
         thumb = None
     # ===== UPLOAD =====
-user_action = {}   # 🔥 ADD THIS LINE
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
     def uprog(c, t):
