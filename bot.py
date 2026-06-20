@@ -210,7 +210,19 @@ def start(_, m):
         "👇 Choose option",
         reply_markup=main_menu()
     )
-    # ===== BUTTON HANDLER (ADVANCED UI FLOW) =====
+@app.on_message(filters.command("start"))
+def start(_, m):
+    m.reply_text(
+        "✨ **AniToons Ultra Bot**\n\n"
+        "⚡ Rename Files\n"
+        "🎬 Convert Video\n"
+        "📦 Bulk System\n"
+        "🖼 Thumbnail Control\n\n"
+        "👇 Choose option",
+        reply_markup=main_menu()
+    )
+
+# ===== BUTTON HANDLER (ADVANCED UI FLOW) =====
 @app.on_callback_query()
 def cb(_, q):
 
@@ -435,17 +447,6 @@ def process_bulk(uid):
     bulk_mode[uid] = False
 
     msg.edit_text("✅ Bulk Completed")
-
-
-# ===== CLEANUP SYSTEM =====
-
-def cleanup(path):
-    try:
-        if os.path.exists(path):
-            os.remove(path)
-    except:
-        pass
-
 
 def cleanup_all():
     while True:
