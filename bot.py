@@ -544,11 +544,8 @@ def process(file, uid, manual_name=None):
     
     ext = os.path.splitext(path)[1]
 out = f"{OUTPUT}/{name}{ext}"
-
-# ✅ ADD THIS (YOU MISSED IT)
 os.rename(path, out)
 
-# ✅ CONVERT (ONLY ONE BLOCK)
 if user_action.get(uid) == "convert":
     new_out = f"{OUTPUT}/{time.time()}.mp4"
 
@@ -563,7 +560,6 @@ if user_action.get(uid) == "convert":
     cleanup(out)
     out = new_out
     ext = ".mp4"
-
 # ===== THUMB =====
  
     thumb = f"{THUMB}/{time.time()}.jpg"
