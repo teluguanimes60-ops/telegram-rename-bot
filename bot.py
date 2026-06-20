@@ -280,7 +280,7 @@ def cb(_, q):
         cancel_task[uid] = True
         q.message.edit_text("❌ Cancelled", reply_markup=main_menu())
     
-# ===== FILE HANDLER (MAIN ENGINE INPUT) =====
+# ===== FILE HANDLER (FIXED FINAL) =====
 
 @app.on_message(filters.document | filters.video | filters.audio)
 def file_handler(_, m):
@@ -288,22 +288,33 @@ def file_handler(_, m):
     uid = m.from_user.id
     mode = user_mode.get(uid)
 
-    # 🚫 BLOCK if no button selected
+    # 🚫 BLOCK if user didn't press buttons
     if not mode:
-        m.reply_text("❌ First choose option using /start")
+        m.reply_text("❌ First select option from menu (/start)")
         return
 
-    # ===== BULK =====
+    # ===== BULK MODE =====
     if bulk_mode.get(uid):
         bulk_files.setdefault(uid, []).append(m)
-        m.reply_text(f"📦 Added ({len(bulk_files[uid])})", reply_markup=bulk_menu())
+        m.reply_text(f"📦 File Added ({len(bulk_files[uid])})", reply_markup=bulk_menu())
         return
 
-    # ===== RENAME =====
+    # ===== WAITING STATES (DO NOTHING) =====
+    if mode in [
+        "rename_menu",
+        "rename_auto_thumb",
+        "rename_saved_thumb",
+        "convert_f2v_thumb"
+    ]:
+        m.reply_text("❌ Complete previous step (choose thumbnail first)")
+        return
+
+    # ===== RENAME AUTO / SAVED =====
     if mode in ["rename_auto", "rename_saved"]:
         queue.put((m, uid))
         return
 
+    # ===== MANUAL RENAME =====
     if mode == "rename_manual":
         user_file[uid] = m
         m.reply_text("✏ Send new name")
@@ -314,8 +325,9 @@ def file_handler(_, m):
         queue.put((m, uid))
         return
 
-    # ❌ WRONG STATE
-    m.reply_text("❌ Complete previous step first")
+    # ❌ FALLBACK
+    m.reply_text("❌ Invalid step, press /start again")
+
 # ===== TEXT HANDLER =====
 
 @app.on_message(filters.text & ~filters.command("start"))
