@@ -474,6 +474,20 @@ def reset_user(uid):
     user_mode[uid] = None
     user_file.pop(uid, None)
     manual_name.pop(uid, None)
+
+# ===== WORKER =====
+def worker():
+    while True:
+        data = queue.get()
+        try:
+            if len(data) == 3:
+                process(data[0], data[1], data[2])
+            else:
+                process(data[0], data[1])
+        except Exception as e:
+            print("Worker Error:", e)
+        queue.task_done()
+        
     # ===== BULK PROCESS ENGINE =====
 
 def process_bulk(uid):
