@@ -549,25 +549,9 @@ def process(file, uid, manual_name=None):
     ext = os.path.splitext(path)[1]
     out = f"{OUTPUT}/{name}{ext}"
 
+os.rename(path, out)
 
-
-    # ===== CONVERT (PUT HERE EXACTLY) =====
-    if user_action.get(uid) == "convert":
-        new_out = f"{OUTPUT}/{time.time()}.mp4"
-
-        subprocess.run([
-            "ffmpeg", "-i", out,
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-c:a", "aac",
-            new_out
-        ])
-
-        cleanup(out)
-        out = new_out
-        ext = ".mp4"
-
-    # ===== CONVERT =====
+# ✅ CONVERT BLOCK (PUT HERE ONLY)
 if user_action.get(uid) == "convert":
     new_out = f"{OUTPUT}/{time.time()}.mp4"
 
