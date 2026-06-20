@@ -319,10 +319,6 @@ if mode == "ready":
         m.reply_text("✏ Send new name")
         return
 
-
-
-# ===== CONVERT =====
-if user_action.get(uid) == "convert":
     new_out = f"{OUTPUT}/{time.time()}.mp4"
 
     subprocess.run([
@@ -547,11 +543,12 @@ def process(file, uid, manual_name=None):
     name = re.sub(r'\d+$', '', name).strip()
     
     ext = os.path.splitext(path)[1]
-    out = f"{OUTPUT}/{name}{ext}"
+out = f"{OUTPUT}/{name}{ext}"
 
+# ✅ ADD THIS (YOU MISSED IT)
 os.rename(path, out)
 
-# ✅ CONVERT BLOCK (PUT HERE ONLY)
+# ✅ CONVERT (ONLY ONE BLOCK)
 if user_action.get(uid) == "convert":
     new_out = f"{OUTPUT}/{time.time()}.mp4"
 
