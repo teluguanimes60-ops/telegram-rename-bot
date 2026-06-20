@@ -239,13 +239,24 @@ def cb(_, q):
         q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
 
     # ===== RENAME MENU =====
+@app.on_callback_query()
+def cb(_, q):
+
+    uid = q.from_user.id
+    data = q.data
+    q.answer()
+
+    if data == "back_main":
+        user_mode[uid] = None
+        q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
+
     elif data == "menu_rename":
         user_mode[uid] = "rename_menu"
         q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
 
-elif data == "rename_auto":
-    user_action[uid] = "rename"
-    user_mode[uid] = "thumb"
+    elif data == "rename_auto":
+        user_action[uid] = "rename"
+        user_mode[uid] = "thumb"
         q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu("menu_rename"))
 
     elif data == "rename_manual":
@@ -254,50 +265,47 @@ elif data == "rename_auto":
 
     elif data == "rename_saved":
         if uid not in saved_name:
-            q.message.edit_text("❌ No saved name!\nGo to settings", reply_markup=back_main())
+            q.message.edit_text("❌ No saved name!", reply_markup=back_main())
         else:
-            user_mode[uid] = "rename_saved_thumb"
+            user_action[uid] = "rename"
+            user_mode[uid] = "thumb"
             q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu("menu_rename"))
 
-    # ===== CONVERT =====
     elif data == "menu_convert":
         q.message.edit_text("🎬 Convert Options", reply_markup=convert_menu())
 
-elif data == "convert_f2v":
-    user_action[uid] = "convert"
-    user_mode[uid] = "thumb"
-        user_mode[uid] = "convert_f2v_thumb"
+    elif data == "convert_f2v":
+        user_action[uid] = "convert"
+        user_mode[uid] = "thumb"
         q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu("menu_convert"))
 
     elif data == "convert_v2f":
-        user_mode[uid] = "convert_v2f"
+        user_action[uid] = "convert"
+        user_mode[uid] = "ready"
         q.message.edit_text("📤 Send video", reply_markup=back_main())
 
-    # ===== THUMB =====
     elif data == "thumb_auto":
-    user_thumb_mode[uid] = "auto"
-    user_mode[uid] = "ready"
-    q.message.edit_text("📤 Send file", reply_markup=back_main())
-
-elif data == "thumb_saved":
-    if uid not in user_saved_thumb:
-        user_mode[uid] = "set_thumb"
-        q.message.edit_text("❌ Send thumbnail first", reply_markup=back_main())
-    else:
-        user_thumb_mode[uid] = "saved"
+        user_thumb_mode[uid] = "auto"
         user_mode[uid] = "ready"
         q.message.edit_text("📤 Send file", reply_markup=back_main())
 
-elif data == "thumb_none":
-    user_thumb_mode[uid] = "none"
-    user_mode[uid] = "ready"
-    q.message.edit_text("📤 Send file", reply_markup=back_main())
-        user_action = {}   # rename / convert
-    # ===== CANCEL =====
+    elif data == "thumb_saved":
+        if uid not in user_saved_thumb:
+            user_mode[uid] = "set_thumb"
+            q.message.edit_text("❌ Send thumbnail first", reply_markup=back_main())
+        else:
+            user_thumb_mode[uid] = "saved"
+            user_mode[uid] = "ready"
+            q.message.edit_text("📤 Send file", reply_markup=back_main())
+
+    elif data == "thumb_none":
+        user_thumb_mode[uid] = "none"
+        user_mode[uid] = "ready"
+        q.message.edit_text("📤 Send file", reply_markup=back_main())
+
     elif data.startswith("cancel_"):
         cancel_task[uid] = True
         q.message.edit_text("❌ Cancelled", reply_markup=main_menu())
-    
 # ===== FILE HANDLER (FIXED FINAL) =====
 
 @app.on_message(filters.document | filters.video | filters.audio)
@@ -330,7 +338,7 @@ def file_handler(_, m):
     # ===== RENAME AUTO / SAVED =====
 if mode == "ready":
     queue.put((m, uid))
-        return
+    return
 
     # ===== MANUAL RENAME =====
     if mode == "rename_manual":
@@ -519,14 +527,22 @@ def process(file, uid, manual_name=None):
     os.rename(path, out)
 
     # ===== CONVERT =====
-subprocess.run([
-    "ffmpeg", "-i", out,
-    "-ss", "1",
-    "-vframes", "1",
-    "-vf", "scale=320:320",
-    "-q:v", "2",
-    thumb
-], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+elif mode_thumb == "auto":
+    thumb = f"{THUMB}/{time.time()}.jpg"
+    try:
+        subprocess.run([
+            "ffmpeg", "-i", out,
+            "-ss", "1",
+            "-vframes", "1",
+            "-vf", "scale=320:320",
+            "-q:v", "2",
+            thumb
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        if not os.path.exists(thumb):
+            thumb = None
+    except:
+        thumb = None
 # ===== THUMB =====
     thumb = None
 
