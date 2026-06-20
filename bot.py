@@ -544,27 +544,26 @@ elif mode_thumb == "auto":
     except:
         thumb = None
 # ===== THUMB =====
-    thumb = None
+ elif mode_thumb == "auto":
+    thumb = f"{THUMB}/{time.time()}.jpg"
 
-    mode_thumb = user_thumb_mode.get(uid)
+    try:
+        subprocess.run([
+            "ffmpeg",
+            "-i", out,
+            "-ss", "00:00:01",
+            "-vframes", "1",
+            "-vf", "scale=320:320",
+            "-q:v", "2",
+            thumb
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    if mode_thumb == "saved":
-        thumb = user_saved_thumb.get(uid)
-
-    elif mode_thumb == "auto":
-        thumb = f"{THUMB}/{time.time()}.jpg"
-        try:
-            subprocess.run([
-                "ffmpeg", "-i", out,
-                "-ss", "2",
-                "-vframes", "1",
-                thumb
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            if not os.path.exists(thumb):
-                thumb = None
-        except:
+        if not os.path.exists(thumb):
             thumb = None
+
+    except Exception as e:
+        print("Thumbnail error:", e)
+        thumb = None
     # ===== UPLOAD =====
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
