@@ -77,36 +77,33 @@ def cleanup(path):
 # ===== UTILS =====
 
 def smart(name):
-    name = re.sub(r'@\w+|\[.*?\]|\(.*?\)', '', name)
-    name = re.sub(r'\d+$', '', name)  # ❌ remove ending numbers
-    name = re.sub(r'[._\-]', ' ', name)
-    name = re.sub(r'\s+', ' ', name).strip()
-    return name.title() or "File"
+    name = name.replace(".", " ").replace("_", " ")
 
-def get_name(f):
-    if f.document:
-        return f.document.file_name
-    elif f.video:
-        return f.video.file_name or "video.mp4"
-    elif f.audio:
-        return f.audio.file_name or "audio.mp3"
-    return "file"
+    # Extract season & episode
+    season = re.search(r'[Ss](\d+)', name)
+    episode = re.search(r'[Ee](\d+)', name)
 
-def bar(p):
-    return "█"*(p//10) + "░"*(10 - p//10)
+    s = f"S{season.group(1)}" if season else ""
+    e = f"E{episode.group(1)}" if episode else ""
 
-def format_size(size):
-    for unit in ["B","KB","MB","GB"]:
-        if size < 1024:
-            return f"{round(size,2)} {unit}"
-        size /= 1024
+    # Extract quality
+    quality = re.search(r'(480p|720p|1080p|2160p)', name, re.I)
+    q = quality.group(1) if quality else ""
 
-def speed_eta(start, current, total):
-    speed = current / (time.time() - start + 1)
-    eta = (total - current) / (speed + 1)
-    return round(speed/1024/1024,2), int(eta)
+    # Extract language
+    lang = re.search(r'(Hindi|English|Telugu|Tamil|Dual Audio)', name, re.I)
+    l = lang.group(1) if lang else ""
 
+    # Clean base name
+    clean = re.sub(r'\[.*?\]|\(.*?\)|@\w+', '', name)
+    clean = re.sub(r'(480p|720p|1080p|2160p)', '', clean, flags=re.I)
+    clean = re.sub(r'(Hindi|English|Telugu|Tamil|Dual Audio)', '', clean, flags=re.I)
+    clean = re.sub(r'[Ss]\d+|[Ee]\d+', '', clean)
+    clean = re.sub(r'\d+$', '', clean)
+    clean = re.sub(r'\s+', ' ', clean).strip()
 
+    final = f"{clean} {s}{e} {q} {l}".strip()
+    return final.title() or "File"
 # ===== UI SYSTEM (ADVANCED EDIT MENU) =====
 
 def main_menu():
@@ -246,8 +243,9 @@ def cb(_, q):
         user_mode[uid] = "rename_menu"
         q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
 
-    elif data == "rename_auto":
-        user_mode[uid] = "rename_auto_thumb"
+elif data == "rename_auto":
+    user_action[uid] = "rename"
+    user_mode[uid] = "thumb"
         q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu("menu_rename"))
 
     elif data == "rename_manual":
@@ -265,7 +263,9 @@ def cb(_, q):
     elif data == "menu_convert":
         q.message.edit_text("🎬 Convert Options", reply_markup=convert_menu())
 
-    elif data == "convert_f2v":
+elif data == "convert_f2v":
+    user_action[uid] = "convert"
+    user_mode[uid] = "thumb"
         user_mode[uid] = "convert_f2v_thumb"
         q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu("menu_convert"))
 
@@ -275,24 +275,24 @@ def cb(_, q):
 
     # ===== THUMB =====
     elif data == "thumb_auto":
-        user_thumb_mode[uid] = "auto"
-        user_mode[uid] = "convert_f2v" if "convert" in str(user_mode.get(uid)) else "rename_auto"
+    user_thumb_mode[uid] = "auto"
+    user_mode[uid] = "ready"
+    q.message.edit_text("📤 Send file", reply_markup=back_main())
+
+elif data == "thumb_saved":
+    if uid not in user_saved_thumb:
+        user_mode[uid] = "set_thumb"
+        q.message.edit_text("❌ Send thumbnail first", reply_markup=back_main())
+    else:
+        user_thumb_mode[uid] = "saved"
+        user_mode[uid] = "ready"
         q.message.edit_text("📤 Send file", reply_markup=back_main())
 
-    elif data == "thumb_saved":
-        if uid not in user_saved_thumb:
-            user_mode[uid] = "set_thumb"
-            q.message.edit_text("❌ Send thumbnail first", reply_markup=back_main())
-        else:
-            user_thumb_mode[uid] = "saved"
-            user_mode[uid] = "convert_f2v" if "convert" in str(user_mode.get(uid)) else "rename_auto"
-            q.message.edit_text("📤 Send file", reply_markup=back_main())
-
-    elif data == "thumb_none":
-        user_thumb_mode[uid] = "none"
-        user_mode[uid] = "convert_f2v" if "convert" in str(user_mode.get(uid)) else "rename_auto"
-        q.message.edit_text("📤 Send file", reply_markup=back_main())
-
+elif data == "thumb_none":
+    user_thumb_mode[uid] = "none"
+    user_mode[uid] = "ready"
+    q.message.edit_text("📤 Send file", reply_markup=back_main())
+        user_action = {}   # rename / convert
     # ===== CANCEL =====
     elif data.startswith("cancel_"):
         cancel_task[uid] = True
@@ -328,8 +328,8 @@ def file_handler(_, m):
         return
 
     # ===== RENAME AUTO / SAVED =====
-    if mode in ["rename_auto", "rename_saved"]:
-        queue.put((m, uid))
+if mode == "ready":
+    queue.put((m, uid))
         return
 
     # ===== MANUAL RENAME =====
@@ -366,7 +366,7 @@ def text_handler(_, m):
     if mode == "rename_manual_thumb":
         if uid in user_file:
             queue.put((user_file[uid], uid, manual_name.get(uid)))
-            user_mode[uid] = None
+            [uid] = None
         return
 
     # ===== SET SAVED NAME =====
@@ -510,6 +510,7 @@ def process(file, uid, manual_name=None):
 
 # ===== NAME =====
     name = manual_name or saved_name.get(uid) or smart(get_name(file))
+    manual_name.pop(uid, None)
     name = re.sub(r'\d+$', '', name).strip()
     
     ext = os.path.splitext(path)[1]
@@ -518,22 +519,14 @@ def process(file, uid, manual_name=None):
     os.rename(path, out)
 
     # ===== CONVERT =====
-    if user_mode.get(uid) == "convert_f2v":
-        new_out = f"{OUTPUT}/{time.time()}.mp4"
-
-        subprocess.run([
-            "ffmpeg", "-i", out,
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-c:a", "aac",
-            "-movflags", "+faststart",
-            new_out
-        ])
-
-        cleanup(out)
-        out = new_out
-        ext = ".mp4"
-
+subprocess.run([
+    "ffmpeg", "-i", out,
+    "-ss", "1",
+    "-vframes", "1",
+    "-vf", "scale=320:320",
+    "-q:v", "2",
+    thumb
+], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 # ===== THUMB =====
     thumb = None
 
