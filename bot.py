@@ -563,7 +563,7 @@ if user_action.get(uid) == "convert":
     cleanup(out)
     out = new_out
     ext = ".mp4"
-
+    
 # ===== THUMB =====
 thumb = None
 mode_thumb = user_thumb_mode.get(uid)
@@ -571,21 +571,25 @@ mode_thumb = user_thumb_mode.get(uid)
 if mode_thumb == "saved":
     thumb = user_saved_thumb.get(uid)
 
-
+elif mode_thumb == "auto":
     thumb = f"{THUMB}/{time.time()}.jpg"
+    try:
+        subprocess.run([
+            "ffmpeg",
+            "-i", out,
+            "-ss", "00:00:01",
+            "-vframes", "1",
+            "-vf", "scale=320:320",
+            "-q:v", "2",
+            thumb
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    subprocess.run([
-        "ffmpeg", "-i", out,
-        "-ss", "00:00:01",
-        "-vframes", "1",
-        "-vf", "scale=320:320",
-        "-q:v", "2",
-        thumb
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if not os.path.exists(thumb):
+            thumb = None
 
-    if not os.path.exists(thumb):
+    except Exception as e:
+        print("Thumbnail error:", e)
         thumb = None
-        
     # ===== CONVERT =====
 
     thumb = f"{THUMB}/{time.time()}.jpg"
