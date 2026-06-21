@@ -398,12 +398,16 @@ f"⬇ **Downloading...**\n\n[{bar}]\n\n⚡ {percent}%"
     out = f"{OUTPUT}/{name}{ext}"
 
     os.rename(path, out)
-
 # ===== CONVERT =====
 if user_action.get(uid) == "convert":
+
     new_out = f"{OUTPUT}/{time.time()}.mp4"
 
-    safe_edit(msg, "🎬 Converting...", progress_btn(uid))
+    safe_edit(
+        msg,
+        "🎬 Converting...\n\n⚙ Processing...",
+        progress_btn(uid)
+    )
 
     import imageio_ffmpeg
     ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
@@ -418,7 +422,6 @@ if user_action.get(uid) == "convert":
     cleanup(out)
     out = new_out
     ext = ".mp4"
-    
     # ===== THUMB =====
     thumb = None
     mode_thumb = user_thumb_mode.get(uid)
