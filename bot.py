@@ -170,7 +170,6 @@ def cb(_, q):
 
     uid = q.from_user.id
     data = q.data
-
     q.answer()
 
     # ===== BACK =====
@@ -178,46 +177,41 @@ def cb(_, q):
         user_mode[uid] = None
         q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
 
-    # ===== MENU NAVIGATION =====
+    # ===== MENU =====
     elif data == "menu_rename":
-        q.message.edit_text("⚙ Rename Options", reply_markup=rename_menu())
+        q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
 
-    elif data == "menu_convert":
-        q.message.edit_text("🎬 Convert Options", reply_markup=convert_menu())
-
-    elif data == "menu_settings":
-        q.message.edit_text("⚙ Settings", reply_markup=settings_menu())
-
-    elif data == "menu_bulk":
-        q.message.edit_text("📦 Bulk Mode", reply_markup=bulk_menu())
-
-    # ===== RENAME OPTIONS =====
+    # ===== AUTO =====
     elif data == "rename_auto":
         user_action[uid] = "rename"
         user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
+        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
 
+    # ===== MANUAL =====
     elif data == "rename_manual":
         user_mode[uid] = "rename_manual"
         q.message.edit_text("✏ Send new file name")
 
-elif data == "rename_saved":
-    if uid not in saved_name:
-        user_mode[uid] = None
-        q.message.edit_text(
-            "❌ No saved name found!\n\n👉 Go to Settings and set a name first.",
-            reply_markup=settings_menu()
-        )
-    else:
+    # ===== SAVED (FIXED CONDITION) =====
+    elif data == "rename_saved":
+
+        # 🔴 IMPORTANT FIX (your requirement)
+        if uid not in saved_name:
+            q.message.edit_text(
+                "❌ You didn't set saved name\n\n👉 Go to Settings and set it first",
+                reply_markup=settings_menu()
+            )
+            return
+
         user_action[uid] = "rename"
         user_mode[uid] = "thumb"
         q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
+
     # ===== CONVERT =====
     elif data == "convert_f2v":
         user_action[uid] = "convert"
         user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
-
+        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
     # ===== THUMB =====
     elif data == "thumb_auto":
         user_thumb_mode[uid] = "auto"
