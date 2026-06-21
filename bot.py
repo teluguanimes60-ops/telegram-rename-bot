@@ -181,6 +181,14 @@ def cb(_, q):
     elif data == "menu_rename":
         q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
 
+    elif data == "menu_convert":
+    q.message.edit_text("🎬 Choose Convert Type", reply_markup=convert_menu())
+
+elif data == "convert_f2v":
+    user_action[uid] = "convert"
+    user_mode[uid] = "thumb"
+    q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
+
     # ===== AUTO =====
     elif data == "rename_auto":
         user_action[uid] = "rename"
@@ -491,6 +499,7 @@ def process(file, uid, manual_name=None):
     user_mode[uid] = None
 
     safe_edit(msg, "✅ Completed 🎉")
+    user_action[uid] = None
 # ===== BULK SYSTEM =====
 
 def process_bulk(uid):
