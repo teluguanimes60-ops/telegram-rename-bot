@@ -8,3 +8,4 @@ psutil
 pillow
 hachoir
 moviepy
+imageio-ffmpeg
