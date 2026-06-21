@@ -395,13 +395,12 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, "🎬 Converting...", progress_btn(uid))
 
 # ===== CONVERT =====
-if user_action.get(uid) == "convert":
-    new_out = f"{OUTPUT}/{time.time()}.mp4"
+    if user_action.get(uid) == "convert":
+        new_out = f"{OUTPUT}/{time.time()}.mp4"
 
-    safe_edit(msg, "🎬 Converting...", progress_btn(uid))
+        safe_edit(msg, "🎬 Converting...", progress_btn(uid))
 
-import imageio_ffmpeg
-
+        import imageio_ffmpeg
         ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 
         subprocess.run([
@@ -411,9 +410,9 @@ import imageio_ffmpeg
             new_out
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    cleanup(out)
-    out = new_out
-    ext = ".mp4"
+        cleanup(out)
+        out = new_out
+        ext = ".mp4"
     
     # ===== THUMB =====
     thumb = None
