@@ -147,6 +147,7 @@ def bulk_menu():
 def progress_btn(uid):
     return InlineKeyboardMarkup([
         [
+            InlineKeyboardButton("📢 Channel", url=CHANNEL),
             InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{uid}")
         ]
     ])
@@ -181,7 +182,7 @@ def cb(_, q):
     elif data == "menu_rename":
         q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
 
-    elif data == "menu_convert":
+elif data == "menu_convert":
     q.message.edit_text("🎬 Choose Convert Type", reply_markup=convert_menu())
 
 elif data == "convert_f2v":
@@ -369,11 +370,12 @@ def process(file, uid, manual_name=None):
             raise Exception("Cancelled")
 
         percent = int(c * 100 / t)
-        bar = "●" * (percent // 10) + "○" * (10 - percent // 10)
+filled = percent // 5
+bar = "█" * filled + "░" * (20 - filled)
 
         safe_edit(
             msg,
-            f"⬇ Downloading...\n[{bar}]\n{percent}%",
+f"⬇ **Downloading...**\n\n[{bar}]\n\n⚡ {percent}%"
             progress_btn(uid)
         )
 
@@ -396,31 +398,25 @@ def process(file, uid, manual_name=None):
 
     os.rename(path, out)
 
-    # ===== CONVERT =====
-    if user_action.get(uid) == "convert":
-        new_out = f"{OUTPUT}/{time.time()}.mp4"
-
-        safe_edit(msg, "🎬 Converting...", progress_btn(uid))
-
 # ===== CONVERT =====
-    if user_action.get(uid) == "convert":
-        new_out = f"{OUTPUT}/{time.time()}.mp4"
+if user_action.get(uid) == "convert":
+    new_out = f"{OUTPUT}/{time.time()}.mp4"
 
-        safe_edit(msg, "🎬 Converting...", progress_btn(uid))
+    safe_edit(msg, "🎬 Converting...", progress_btn(uid))
 
-        import imageio_ffmpeg
-        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+    import imageio_ffmpeg
+    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 
-        subprocess.run([
-            ffmpeg_path,
-            "-y",
-            "-i", out,
-            new_out
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run([
+        ffmpeg_path,
+        "-y",
+        "-i", out,
+        new_out
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        cleanup(out)
-        out = new_out
-        ext = ".mp4"
+    cleanup(out)
+    out = new_out
+    ext = ".mp4"
     
     # ===== THUMB =====
     thumb = None
@@ -459,11 +455,12 @@ def process(file, uid, manual_name=None):
             raise Exception("Cancelled")
 
         percent = int(c * 100 / t)
-        bar = "●" * (percent // 10) + "○" * (10 - percent // 10)
+filled = percent // 5
+bar = "█" * filled + "░" * (20 - filled)
 
         safe_edit(
             msg,
-            f"⬆ Uploading...\n[{bar}]\n{percent}%",
+f"⬆ **Uploading...**\n\n[{bar}]\n\n🚀 {percent}%"
             progress_btn(uid)
         )
 
