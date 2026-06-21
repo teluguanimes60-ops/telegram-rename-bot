@@ -357,7 +357,6 @@ def start_workers():
 def process(file, uid, manual_name=None):
 
     cancel_task[uid] = False
-
     msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn(uid))
     start = time.time()
 
@@ -367,13 +366,11 @@ def process(file, uid, manual_name=None):
             raise Exception("Cancelled")
 
         percent = int(c * 100 / t)
-        speed = c / (time.time() - start + 1)
-
         bar = "●" * (percent // 10) + "○" * (10 - percent // 10)
 
         safe_edit(
             msg,
-            f"⬇ Downloading\n[{bar}]\n{percent}%\n⚡ {round(speed/1024/1024,2)} MB/s",
+            f"⬇ Downloading...\n[{bar}]\n{percent}%",
             progress_btn(uid)
         )
 
@@ -387,11 +384,13 @@ def process(file, uid, manual_name=None):
         return
 
     # ===== FILE NAME =====
-    name = manual_name or saved_name.get(uid) or smart(file.file_name or "File")
+    name = manual_name or saved_name.get(uid) or file.file_name or "AniToons"
+    name = os.path.splitext(name)[0]
     name = re.sub(r'\d+$', '', name).strip()
 
     ext = os.path.splitext(path)[1]
     out = f"{OUTPUT}/{name}{ext}"
+
     os.rename(path, out)
 
     # ===== CONVERT =====
@@ -400,19 +399,24 @@ def process(file, uid, manual_name=None):
 
         safe_edit(msg, "🎬 Converting...", progress_btn(uid))
 
-        subprocess.run([
-            "ffmpeg", "-i", out,
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-c:a", "aac",
-            new_out
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-i", out,
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-c:a", "aac",
+                new_out
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except:
+            safe_edit(msg, "❌ Convert Failed")
+            return
 
         cleanup(out)
         out = new_out
         ext = ".mp4"
 
-    # ===== THUMBNAIL =====
+    # ===== THUMB =====
     thumb = None
     mode_thumb = user_thumb_mode.get(uid)
 
@@ -425,11 +429,10 @@ def process(file, uid, manual_name=None):
         try:
             subprocess.run([
                 "ffmpeg",
+                "-y",
                 "-i", out,
                 "-ss", "00:00:01",
                 "-vframes", "1",
-                "-vf", "scale=320:320",
-                "-q:v", "2",
                 thumb
             ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -454,22 +457,25 @@ def process(file, uid, manual_name=None):
 
         safe_edit(
             msg,
-            f"⬆ Uploading\n[{bar}]\n{percent}%",
+            f"⬆ Uploading...\n[{bar}]\n{percent}%",
             progress_btn(uid)
         )
 
     try:
+        # 🔥 IMPORTANT FIX: use app not file.reply_*
         if ext in [".mp4", ".mkv"]:
-            file.reply_video(
-                out,
+            app.send_video(
+                chat_id=uid,
+                video=out,
                 caption=f"✅ {name}",
                 thumb=thumb if thumb and os.path.exists(thumb) else None,
                 supports_streaming=True,
                 progress=uprog
             )
         else:
-            file.reply_document(
-                out,
+            app.send_document(
+                chat_id=uid,
+                document=out,
                 caption=f"✅ {name}",
                 progress=uprog
             )
@@ -478,7 +484,7 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
         return
 
-    # ===== CLEANUP =====
+    # ===== CLEAN =====
     cleanup(out)
 
     if thumb and os.path.exists(thumb):
