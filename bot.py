@@ -398,16 +398,19 @@ def process(file, uid, manual_name=None):
         new_out = f"{OUTPUT}/{time.time()}.mp4"
 
         safe_edit(msg, "🎬 Converting...", progress_btn(uid))
-
+import imageio_ffmpeg
         try:
-            subprocess.run([
-                "ffmpeg", "-y",
-                "-i", out,
-                "-c:v", "libx264",
-                "-preset", "ultrafast",
-                "-c:a", "aac",
-                new_out
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+
+subprocess.run([
+    ffmpeg_path,
+    "-i", out,
+    "-ss", "00:00:01",
+    "-vframes", "1",
+    "-vf", "scale=320:320",
+    "-q:v", "2",
+    thumb
+], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except:
             safe_edit(msg, "❌ Convert Failed")
             return
