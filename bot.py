@@ -366,19 +366,19 @@ def process(file, uid, manual_name=None):
     start = time.time()
 
     # ===== DOWNLOAD =====
-    def dprog(c, t):
-        if cancel_task.get(uid):
-            raise Exception("Cancelled")
+def dprog(c, t):
+    if cancel_task.get(uid):
+        raise Exception("Cancelled")
 
-percent = int(c * 100 / t)
-        filled = percent // 5
-        bar = "█" * filled + "░" * (20 - filled)
+    percent = int(c * 100 / t)
+    filled = percent // 5
+    bar = "█" * filled + "░" * (20 - filled)
 
-        safe_edit(
-            msg,
-            f"⬇ Downloading...\n\n[{bar}]\n\n⚡ {percent}%",
-            progress_btn(uid)
-        )
+    safe_edit(
+        msg,
+        f"⬇ Downloading...\n\n[{bar}]\n\n⚡ {percent}%",
+        progress_btn(uid)
+    )
 
     try:
         path = file.download(
@@ -454,19 +454,19 @@ if user_action.get(uid) == "convert":
     # ===== UPLOAD =====
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
-    def uprog(c, t):
-        if cancel_task.get(uid):
-            raise Exception("Cancelled")
+def uprog(c, t):
+    if cancel_task.get(uid):
+        raise Exception("Cancelled")
 
-        percent = int(c * 100 / t)
-filled = percent // 5
-bar = "█" * filled + "░" * (20 - filled)
+    percent = int(c * 100 / t)
+    filled = percent // 5
+    bar = "█" * filled + "░" * (20 - filled)
 
-        safe_edit(
-            msg,
-f"⬆ **Uploading...**\n\n[{bar}]\n\n🚀 {percent}%"
-            progress_btn(uid)
-        )
+    safe_edit(
+        msg,
+        f"⬆ Uploading...\n\n[{bar}]\n\n🚀 {percent}%",
+        progress_btn(uid)
+    )
 
     try:
         # 🔥 IMPORTANT FIX: use app not file.reply_*
