@@ -8,6 +8,3 @@ psutil
 pillow
 hachoir
 moviepy
-ffmpeg required
-print("THUMB PATH:", thumb)
-apt-get update && apt-get install -y ffmpeg
