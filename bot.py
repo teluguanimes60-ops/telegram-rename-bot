@@ -207,11 +207,6 @@ def cb(_, q):
         user_mode[uid] = "thumb"
         q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
 
-    # ===== CONVERT =====
-    elif data == "convert_f2v":
-        user_action[uid] = "convert"
-        user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
     # ===== THUMB =====
     elif data == "thumb_auto":
         user_thumb_mode[uid] = "auto"
@@ -398,22 +393,18 @@ def process(file, uid, manual_name=None):
         new_out = f"{OUTPUT}/{time.time()}.mp4"
 
         safe_edit(msg, "🎬 Converting...", progress_btn(uid))
-import imageio_ffmpeg
-        try:
+
+        import imageio_ffmpeg
 ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 
 subprocess.run([
     ffmpeg_path,
+    "-y",
     "-i", out,
     "-ss", "00:00:01",
     "-vframes", "1",
-    "-vf", "scale=320:320",
-    "-q:v", "2",
     thumb
 ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except:
-            safe_edit(msg, "❌ Convert Failed")
-            return
 
         cleanup(out)
         out = new_out
