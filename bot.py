@@ -361,7 +361,6 @@ def process(file, uid, manual_name=None):
 
     cancel_task[uid] = False
     msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn(uid))
-    start = time.time()
 
     # ===== DOWNLOAD =====
     def dprog(c, t):
@@ -372,12 +371,9 @@ def process(file, uid, manual_name=None):
         filled = percent // 5
         bar = "█" * filled + "░" * (20 - filled)
 
-        safe_edit(
-            msg,
-            f"⬇ Downloading...\n\n[{bar}]\n\n⚡ {percent}%",
-            progress_btn(uid)
-        )
-try:
+        safe_edit(msg, f"⬇ Downloading...\n\n[{bar}]\n\n⚡ {percent}%", progress_btn(uid))
+
+    try:
         path = file.download(
             file_name=f"{DOWNLOAD}/{time.time()}",
             progress=dprog
@@ -385,6 +381,7 @@ try:
     except:
         safe_edit(msg, "❌ Download Cancelled")
         return
+
     # ===== FILE NAME =====
     name = manual_name or saved_name.get(uid) or file.file_name or "AniToons"
     name = os.path.splitext(name)[0]
@@ -395,50 +392,11 @@ try:
 
     os.rename(path, out)
 
-# ===== UPLOAD =====
-    safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
-
-    def uprog(c, t):
-        percent = int(c * 100 / t)
-        filled = percent // 5
-        bar = "█" * filled + "░" * (20 - filled)
-
-        safe_edit(
-            msg,
-            f"⬆ Uploading...\n\n[{bar}]\n\n🚀 {percent}%",
-            progress_btn(uid)
-        )
-
-    try:
-        if ext in [".mp4", ".mkv"]:
-            app.send_video(
-                chat_id=uid,
-                video=out,
-                caption=f"✅ {name}",
-                progress=uprog
-            )
-        else:
-            app.send_document(
-                chat_id=uid,
-                document=out,
-                caption=f"✅ {name}",
-                progress=uprog
-            )
-
-    except Exception as e:
-        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
-        return
-
-# ===== CONVERT =====
+    # ===== CONVERT =====
     if user_action.get(uid) == "convert":
-
         new_out = f"{OUTPUT}/{time.time()}.mp4"
 
-        safe_edit(
-            msg,
-            "🎬 Converting...\n\n⚙ Processing...",
-            progress_btn(uid)
-        )
+        safe_edit(msg, "🎬 Converting...", progress_btn(uid))
 
         import imageio_ffmpeg
         ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
@@ -453,84 +411,44 @@ try:
         cleanup(out)
         out = new_out
         ext = ".mp4"
-    # ===== THUMB =====
-    thumb = None
-    mode_thumb = user_thumb_mode.get(uid)
 
-    if mode_thumb == "saved":
-        thumb = user_saved_thumb.get(uid)
+    # ===== UPLOAD =====
+    safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
-    elif mode_thumb == "auto":
-        thumb = f"{THUMB}/{time.time()}.jpg"
+    def uprog(c, t):
+        percent = int(c * 100 / t)
+        filled = percent // 5
+        bar = "█" * filled + "░" * (20 - filled)
 
-        try:
-            subprocess.run([
-                "ffmpeg",
-                "-y",
-                "-i", out,
-                "-ss", "00:00:01",
-                "-vframes", "1",
-                thumb
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        safe_edit(msg, f"⬆ Uploading...\n\n[{bar}]\n\n🚀 {percent}%", progress_btn(uid))
 
-            if not os.path.exists(thumb):
-                thumb = None
+    try:
+        if ext in [".mp4", ".mkv"]:
+            app.send_video(
+                chat_id=uid,
+                video=out,
+                caption=f"✅ {name}",
+                supports_streaming=True,
+                progress=uprog
+            )
+        else:
+            app.send_document(
+                chat_id=uid,
+                document=out,
+                caption=f"✅ {name}",
+                progress=uprog
+            )
 
-        except:
-            thumb = None
+    except Exception as e:
+        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
+        return
 
-    elif mode_thumb == "none":
-        thumb = None
-
-# ===== UPLOAD =====
-safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
-
-def uprog(c, t):
-    if cancel_task.get(uid):
-        raise Exception("Cancelled")
-
-    percent = int(c * 100 / t)
-    filled = percent // 5
-    bar = "█" * filled + "░" * (20 - filled)
-
-    safe_edit(
-        msg,
-        f"⬆ Uploading...\n\n[{bar}]\n\n🚀 {percent}%",
-        progress_btn(uid)
-    )
-
-# 👇 THIS IS IMPORTANT (OUTSIDE uprog)
-try:
-    if ext in [".mp4", ".mkv"]:
-        app.send_video(
-            chat_id=uid,
-            video=out,
-            caption=f"✅ {name}",
-            thumb=thumb if thumb and os.path.exists(thumb) else None,
-            supports_streaming=True,
-            progress=uprog
-        )
-    else:
-        app.send_document(
-            chat_id=uid,
-            document=out,
-            caption=f"✅ {name}",
-            progress=uprog
-        )
-
-except Exception as e:
-    safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
-    return
     # ===== CLEAN =====
     cleanup(out)
-
-    if thumb and os.path.exists(thumb):
-        cleanup(thumb)
-
     user_mode[uid] = None
+    user_action[uid] = None
 
     safe_edit(msg, "✅ Completed 🎉")
-    user_action[uid] = None
 # ===== BULK SYSTEM =====
 
 def process_bulk(uid):
