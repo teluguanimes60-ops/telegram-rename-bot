@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: anitoons-bot
+    runtime: python
+    buildCommand: |
+      pip install -r requirements.txt
+    startCommand: python bot.py
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
