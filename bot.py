@@ -370,13 +370,13 @@ def process(file, uid, manual_name=None):
         if cancel_task.get(uid):
             raise Exception("Cancelled")
 
-        percent = int(c * 100 / t)
-filled = percent // 5
-bar = "█" * filled + "░" * (20 - filled)
+percent = int(c * 100 / t)
+        filled = percent // 5
+        bar = "█" * filled + "░" * (20 - filled)
 
         safe_edit(
             msg,
-f"⬇ **Downloading...**\n\n[{bar}]\n\n⚡ {percent}%"
+            f"⬇ Downloading...\n\n[{bar}]\n\n⚡ {percent}%",
             progress_btn(uid)
         )
 
