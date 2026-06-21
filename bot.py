@@ -358,20 +358,22 @@ def process(file, uid, manual_name=None):
 
     cancel_task[uid] = False
 
-    msg = file.reply_text("⏳ Processing...", reply_markup=progress_btn(uid))
+    msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn(uid))
     start = time.time()
 
     # ===== DOWNLOAD =====
     def dprog(c, t):
         if cancel_task.get(uid):
-            raise Exception()
+            raise Exception("Cancelled")
 
-        p = int(c * 100 / t)
+        percent = int(c * 100 / t)
         speed = c / (time.time() - start + 1)
+
+        bar = "●" * (percent // 10) + "○" * (10 - percent // 10)
 
         safe_edit(
             msg,
-            f"⬇ {p}%\n⚡ {round(speed/1024/1024,2)} MB/s",
+            f"⬇ Downloading\n[{bar}]\n{percent}%\n⚡ {round(speed/1024/1024,2)} MB/s",
             progress_btn(uid)
         )
 
@@ -384,7 +386,7 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, "❌ Download Cancelled")
         return
 
-    # ===== NAME =====
+    # ===== FILE NAME =====
     name = manual_name or saved_name.get(uid) or smart(file.file_name or "File")
     name = re.sub(r'\d+$', '', name).strip()
 
@@ -396,19 +398,21 @@ def process(file, uid, manual_name=None):
     if user_action.get(uid) == "convert":
         new_out = f"{OUTPUT}/{time.time()}.mp4"
 
+        safe_edit(msg, "🎬 Converting...", progress_btn(uid))
+
         subprocess.run([
             "ffmpeg", "-i", out,
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-c:a", "aac",
             new_out
-        ])
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         cleanup(out)
         out = new_out
         ext = ".mp4"
 
-    # ===== THUMB =====
+    # ===== THUMBNAIL =====
     thumb = None
     mode_thumb = user_thumb_mode.get(uid)
 
@@ -435,16 +439,24 @@ def process(file, uid, manual_name=None):
         except:
             thumb = None
 
+    elif mode_thumb == "none":
+        thumb = None
+
     # ===== UPLOAD =====
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
     def uprog(c, t):
         if cancel_task.get(uid):
-            raise Exception()
+            raise Exception("Cancelled")
 
-        p = int(c * 100 / t)
+        percent = int(c * 100 / t)
+        bar = "●" * (percent // 10) + "○" * (10 - percent // 10)
 
-        safe_edit(msg, f"⬆ {p}%", progress_btn(uid))
+        safe_edit(
+            msg,
+            f"⬆ Uploading\n[{bar}]\n{percent}%",
+            progress_btn(uid)
+        )
 
     try:
         if ext in [".mp4", ".mkv"]:
@@ -461,19 +473,20 @@ def process(file, uid, manual_name=None):
                 caption=f"✅ {name}",
                 progress=uprog
             )
-    except:
-        safe_edit(msg, "❌ Upload Cancelled")
+
+    except Exception as e:
+        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
         return
 
     # ===== CLEANUP =====
     cleanup(out)
-    if thumb and "thumbs" in thumb:
+
+    if thumb and os.path.exists(thumb):
         cleanup(thumb)
 
     user_mode[uid] = None
 
-    safe_edit(msg, "✅ Completed")
-
+    safe_edit(msg, "✅ Completed 🎉")
 # ===== BULK SYSTEM =====
 
 def process_bulk(uid):
