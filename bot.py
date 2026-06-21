@@ -395,15 +395,14 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, "🎬 Converting...", progress_btn(uid))
 
         import imageio_ffmpeg
+
 ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 
 subprocess.run([
     ffmpeg_path,
     "-y",
     "-i", out,
-    "-ss", "00:00:01",
-    "-vframes", "1",
-    thumb
+    new_out
 ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         cleanup(out)
