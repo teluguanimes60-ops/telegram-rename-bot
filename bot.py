@@ -357,29 +357,26 @@ def start_workers():
     for _ in range(WORKERS):
         threading.Thread(target=worker, daemon=True).start()
 
-# ===== PROCESS FUNCTION =====
-
 def process(file, uid, manual_name=None):
 
     cancel_task[uid] = False
     msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn(uid))
     start = time.time()
 
-# ===== DOWNLOAD =====
+    # ===== DOWNLOAD =====
     def dprog(c, t):
-    if cancel_task.get(uid):
-        raise Exception("Cancelled")
+        if cancel_task.get(uid):
+            raise Exception("Cancelled")
 
-    percent = int(c * 100 / t)
-    filled = percent // 5
-    bar = "█" * filled + "░" * (20 - filled)
+        percent = int(c * 100 / t)
+        filled = percent // 5
+        bar = "█" * filled + "░" * (20 - filled)
 
-    safe_edit(
-        msg,
-        f"⬇ Downloading...\n\n[{bar}]\n\n⚡ {percent}%",
-        progress_btn(uid)
-    )
-
+        safe_edit(
+            msg,
+            f"⬇ Downloading...\n\n[{bar}]\n\n⚡ {percent}%",
+            progress_btn(uid)
+        )
 try:
         path = file.download(
             file_name=f"{DOWNLOAD}/{time.time()}",
@@ -450,22 +447,22 @@ try:
     elif mode_thumb == "none":
         thumb = None
 
-    # ===== UPLOAD =====
+# ===== UPLOAD =====
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
-def uprog(c, t):
-    if cancel_task.get(uid):
-        raise Exception("Cancelled")
+    def uprog(c, t):
+        if cancel_task.get(uid):
+            raise Exception("Cancelled")
 
-    percent = int(c * 100 / t)
-    filled = percent // 5
-    bar = "█" * filled + "░" * (20 - filled)
+        percent = int(c * 100 / t)
+        filled = percent // 5
+        bar = "█" * filled + "░" * (20 - filled)
 
-    safe_edit(
-        msg,
-        f"⬆ Uploading...\n\n[{bar}]\n\n🚀 {percent}%",
-        progress_btn(uid)
-    )
+        safe_edit(
+            msg,
+            f"⬆ Uploading...\n\n[{bar}]\n\n🚀 {percent}%",
+            progress_btn(uid)
+        )
 
     try:
         # 🔥 IMPORTANT FIX: use app not file.reply_*
