@@ -400,15 +400,16 @@ if user_action.get(uid) == "convert":
 
     safe_edit(msg, "🎬 Converting...", progress_btn(uid))
 
-    import imageio_ffmpeg
-    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+import imageio_ffmpeg
 
-    subprocess.run([
-        ffmpeg_path,
-        "-y",
-        "-i", out,
-        new_out
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+
+        subprocess.run([
+            ffmpeg_path,
+            "-y",
+            "-i", out,
+            new_out
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     cleanup(out)
     out = new_out
