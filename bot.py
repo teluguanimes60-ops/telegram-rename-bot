@@ -201,11 +201,17 @@ def cb(_, q):
         user_mode[uid] = "rename_manual"
         q.message.edit_text("✏ Send new file name")
 
-    elif data == "rename_saved":
+elif data == "rename_saved":
+    if uid not in saved_name:
+        user_mode[uid] = None
+        q.message.edit_text(
+            "❌ No saved name found!\n\n👉 Go to Settings and set a name first.",
+            reply_markup=settings_menu()
+        )
+    else:
         user_action[uid] = "rename"
         user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
-
+        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
     # ===== CONVERT =====
     elif data == "convert_f2v":
         user_action[uid] = "convert"
