@@ -394,6 +394,41 @@ try:
     out = f"{OUTPUT}/{name}{ext}"
 
     os.rename(path, out)
+
+# ===== UPLOAD =====
+    safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
+
+    def uprog(c, t):
+        percent = int(c * 100 / t)
+        filled = percent // 5
+        bar = "█" * filled + "░" * (20 - filled)
+
+        safe_edit(
+            msg,
+            f"⬆ Uploading...\n\n[{bar}]\n\n🚀 {percent}%",
+            progress_btn(uid)
+        )
+
+    try:
+        if ext in [".mp4", ".mkv"]:
+            app.send_video(
+                chat_id=uid,
+                video=out,
+                caption=f"✅ {name}",
+                progress=uprog
+            )
+        else:
+            app.send_document(
+                chat_id=uid,
+                document=out,
+                caption=f"✅ {name}",
+                progress=uprog
+            )
+
+    except Exception as e:
+        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
+        return
+
 # ===== CONVERT =====
     if user_action.get(uid) == "convert":
 
