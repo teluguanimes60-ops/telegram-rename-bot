@@ -164,8 +164,6 @@ def start(_, m):
     )
 
 
-# ===== CALLBACK HANDLER =====
-
 @app.on_callback_query()
 def cb(_, q):
 
@@ -179,16 +177,23 @@ def cb(_, q):
         q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
 
     # ===== MENU =====
-elif data == "menu_rename":
-    q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
+    elif data == "menu_rename":
+        q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
 
-elif data == "menu_convert":
-    q.message.edit_text("🎬 Choose Convert Type", reply_markup=convert_menu())
+    elif data == "menu_convert":
+        q.message.edit_text("🎬 Choose Convert Type", reply_markup=convert_menu())
 
-elif data == "convert_f2v":
-    user_action[uid] = "convert"
-    user_mode[uid] = "thumb"
-    q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
+    # ===== CONVERT =====
+    elif data == "convert_f2v":
+        user_action[uid] = "convert"
+        user_mode[uid] = "thumb"
+        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
+
+    elif data == "convert_v2f":
+        user_action[uid] = "convert"
+        user_mode[uid] = "thumb"
+        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
+
     # ===== AUTO =====
     elif data == "rename_auto":
         user_action[uid] = "rename"
@@ -200,13 +205,11 @@ elif data == "convert_f2v":
         user_mode[uid] = "rename_manual"
         q.message.edit_text("✏ Send new file name")
 
-    # ===== SAVED (FIXED CONDITION) =====
+    # ===== SAVED =====
     elif data == "rename_saved":
-
-        # 🔴 IMPORTANT FIX (your requirement)
         if uid not in saved_name:
             q.message.edit_text(
-                "❌ You didn't set saved name\n\n👉 Go to Settings and set it first",
+                "❌ You didn't set saved name\n\n👉 Go to Settings first",
                 reply_markup=settings_menu()
             )
             return
@@ -254,7 +257,6 @@ elif data == "convert_f2v":
     elif data.startswith("cancel_"):
         cancel_task[uid] = True
         q.message.edit_text("❌ Cancelled")
-
 # ===== FILE HANDLER =====
 
 @app.on_message(filters.document | filters.video | filters.audio)
