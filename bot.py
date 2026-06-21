@@ -365,8 +365,8 @@ def process(file, uid, manual_name=None):
     msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn(uid))
     start = time.time()
 
-    # ===== DOWNLOAD =====
-def dprog(c, t):
+# ===== DOWNLOAD =====
+    def dprog(c, t):
     if cancel_task.get(uid):
         raise Exception("Cancelled")
 
@@ -380,7 +380,7 @@ def dprog(c, t):
         progress_btn(uid)
     )
 
-    try:
+try:
         path = file.download(
             file_name=f"{DOWNLOAD}/{time.time()}",
             progress=dprog
@@ -388,7 +388,6 @@ def dprog(c, t):
     except:
         safe_edit(msg, "❌ Download Cancelled")
         return
-
     # ===== FILE NAME =====
     name = manual_name or saved_name.get(uid) or file.file_name or "AniToons"
     name = os.path.splitext(name)[0]
@@ -399,29 +398,29 @@ def dprog(c, t):
 
     os.rename(path, out)
 # ===== CONVERT =====
-if user_action.get(uid) == "convert":
+    if user_action.get(uid) == "convert":
 
-    new_out = f"{OUTPUT}/{time.time()}.mp4"
+        new_out = f"{OUTPUT}/{time.time()}.mp4"
 
-    safe_edit(
-        msg,
-        "🎬 Converting...\n\n⚙ Processing...",
-        progress_btn(uid)
-    )
+        safe_edit(
+            msg,
+            "🎬 Converting...\n\n⚙ Processing...",
+            progress_btn(uid)
+        )
 
-    import imageio_ffmpeg
-    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+        import imageio_ffmpeg
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 
-    subprocess.run([
-        ffmpeg_path,
-        "-y",
-        "-i", out,
-        new_out
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run([
+            ffmpeg_path,
+            "-y",
+            "-i", out,
+            new_out
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    cleanup(out)
-    out = new_out
-    ext = ".mp4"
+        cleanup(out)
+        out = new_out
+        ext = ".mp4"
     # ===== THUMB =====
     thumb = None
     mode_thumb = user_thumb_mode.get(uid)
