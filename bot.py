@@ -395,36 +395,32 @@ if False:
 
 print("Uploading file:", out)
     # ===== UPLOAD =====
-    safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
+last_update = {}
 
-    def uprog(c, t):
-        percent = int(c * 100 / t)
-        filled = percent // 5
-        bar = "█" * filled + "░" * (20 - filled)
+def smart_progress(current, total, msg, uid, text):
+    now = time.time()
 
-        safe_edit(msg, f"⬆ Uploading...\n\n[{bar}]\n\n🚀 {percent}%", progress_btn(uid))
-
-    try:
-        if ext in [".mp4", ".mkv"]:
-            app.send_video(
-                chat_id=uid,
-                video=out,
-                caption=f"✅ {name}",
-                supports_streaming=True,
-                progress=uprog
-            )
-        else:
-            app.send_document(
-                chat_id=uid,
-                document=out,
-                caption=f"✅ {name}",
-                progress=uprog
-            )
-
-    except Exception as e:
-        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
+    # 🚀 limit updates (reduce lag)
+    if uid in last_update and now - last_update[uid] < 0.8:
         return
+    last_update[uid] = now
 
+    percent = int(current * 100 / total)
+
+    # ⚡ 20 block clean bar (best for Telegram)
+    filled = percent // 5
+    bar = "█" * filled + "░" * (20 - filled)
+
+    speed = current / max(1, now - (last_update.get(f"start_{uid}", now)))
+    speed = speed / 1024 / 1024  # MB/s
+
+    safe_edit(
+        msg,
+        f"{text}\n\n"
+        f"[{bar}] {percent}%\n\n"
+        f"⚡ Speed: {speed:.2f} MB/s",
+        progress_btn(uid)
+    )
     # ===== CLEAN =====
     cleanup(out)
     user_mode[uid] = None
