@@ -374,48 +374,54 @@ def process(file, uid, manual_name=None):
         return
 
     # ===== UPLOAD =====
-    last_update = [0]
+safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
-    def uprog(c, t):
-        now = time.time()
+start_upload = time.time()
+last_update = [0]
 
-        if now - last_update[0] < 0.8:
-            return
-        last_update[0] = now
+def uprog(current, total):
+    now = time.time()
 
-        percent = int(c * 100 / t)
-        filled = percent // 5
-        bar = "█" * filled + "░" * (20 - filled)
+    # limit updates (fast + smooth)
+    if now - last_update[0] < 1:
+        return
+    last_update[0] = now
 
-        speed = c / max(1, now - start_time)
-        speed = speed / 1024 / 1024  # MB/s
+    percent = int(current * 100 / total)
+    filled = percent // 5
+    bar = "█" * filled + "░" * (20 - filled)
 
-        safe_edit(
-            msg,
-            f"⬆ Uploading...\n\n[{bar}] {percent}%\n\n⚡ {speed:.2f} MB/s",
-            progress_btn(uid)
+    speed = current / max(1, now - start_upload)
+    speed = speed / 1024 / 1024  # MB/s
+
+    safe_edit(
+        msg,
+        f"⬆ Uploading...\n\n[{bar}]\n\n🚀 {percent}%\n⚡ {speed:.2f} MB/s",
+        progress_btn(uid)
+    )
+
+try:
+    if ext.lower() in [".mp4", ".mkv"]:
+        app.send_video(
+            uid,
+            out,
+            caption=f"✅ {name}",
+            supports_streaming=True,
+            progress=uprog
+        )
+    else:
+        app.send_document(
+            uid,
+            out,
+            caption=f"✅ {name}",
+            progress=uprog
         )
 
-    try:
-        if ext.lower() in [".mp4", ".mkv"]:
-            app.send_video(
-                chat_id=uid,
-                video=out,
-                caption=f"✅ {name}",
-                supports_streaming=True,
-                progress=uprog
-            )
-        else:
-            app.send_document(
-                chat_id=uid,
-                document=out,
-                caption=f"✅ {name}",
-                progress=uprog
-            )
+    safe_edit(msg, "✅ Upload Completed 🎉")
 
-    except Exception as e:
-        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
-        return
+except Exception as e:
+    safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
+    return
 
     # ===== CLEANUP =====
     cleanup(out)
