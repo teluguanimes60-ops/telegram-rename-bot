@@ -373,7 +373,7 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, f"❌ Rename Error\n{str(e)}")
         return
 
-print("Uploading file:", out)
+    print("Uploading file:", out)
 
     if not os.path.exists(out):
         safe_edit(msg, "❌ File missing after rename")
