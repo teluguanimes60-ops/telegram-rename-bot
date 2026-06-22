@@ -184,15 +184,15 @@ def cb(_, q):
         q.message.edit_text("🎬 Choose Convert Type", reply_markup=convert_menu())
 
     # ===== CONVERT =====
-    elif data == "convert_f2v":
-        user_action[uid] = "convert"
-        user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
+elif data == "convert_f2v":
+    user_action[uid] = "convert"
+    user_mode[uid] = "rename_choice"
+    q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
 
-    elif data == "convert_v2f":
-        user_action[uid] = "convert"
-        user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
+elif data == "convert_v2f":
+    user_action[uid] = "convert"
+    user_mode[uid] = "rename_choice"
+    q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
 
     # ===== AUTO =====
     elif data == "rename_auto":
@@ -373,7 +373,7 @@ def process(file, uid, manual_name=None):
 
         safe_edit(msg, f"⬇ Downloading...\n\n[{bar}]\n\n⚡ {percent}%", progress_btn(uid))
 
-    try:
+try:
         path = file.download(
             file_name=f"{DOWNLOAD}/{time.time()}",
             progress=dprog
