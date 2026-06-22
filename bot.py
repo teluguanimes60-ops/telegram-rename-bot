@@ -338,17 +338,10 @@ def process(file, uid, manual_name=None):
     cancel_task[uid] = False
     msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn(uid))
 
-    start_time = time.time()
-
     # ===== DOWNLOAD =====
     def dprog(c, t):
-        if cancel_task.get(uid):
-            raise Exception("Cancelled")
-
         percent = int(c * 100 / t)
-        filled = percent // 5
-        bar = "█" * filled + "░" * (20 - filled)
-
+        bar = "█" * (percent // 5) + "░" * (20 - percent // 5)
         safe_edit(msg, f"⬇ Downloading...\n\n[{bar}] {percent}%", progress_btn(uid))
 
     try:
@@ -360,7 +353,7 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, "❌ Download Cancelled")
         return
 
-# ===== FILE NAME =====
+    # ===== FILE NAME + UPLOAD (THIS MUST BE INSIDE FUNCTION) =====
     name = manual_name or saved_name.get(uid) or getattr(file, "file_name", None) or "AniToons"
     name = re.sub(r'\d+$', '', name).strip()
 
@@ -373,7 +366,7 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, f"❌ Rename Error\n{str(e)}")
         return
 
-    print("Uploading file:", out)
+    print("DEBUG: Upload starting ->", out)
 
     if not os.path.exists(out):
         safe_edit(msg, "❌ File missing after rename")
@@ -384,8 +377,7 @@ def process(file, uid, manual_name=None):
 
     def uprog(c, t):
         percent = int(c * 100 / t)
-        filled = percent // 5
-        bar = "█" * filled + "░" * (20 - filled)
+        bar = "█" * (percent // 5) + "░" * (20 - percent // 5)
         safe_edit(msg, f"⬆ Uploading...\n\n[{bar}] {percent}%", progress_btn(uid))
 
     try:
