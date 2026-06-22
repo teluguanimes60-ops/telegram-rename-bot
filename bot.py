@@ -374,61 +374,57 @@ def process(file, uid, manual_name=None):
         return
 
     # ===== UPLOAD =====
-safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
+    safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
-start_upload = time.time()
-last_update = [0]
+    last_update = [0]
 
-def uprog(current, total):
-    now = time.time()
+    def uprog(current, total):
+        now = time.time()
 
-    # limit updates (fast + smooth)
-    if now - last_update[0] < 1:
+        if now - last_update[0] < 1:
+            return
+        last_update[0] = now
+
+        percent = int(current * 100 / total)
+        filled = percent // 5
+        bar = "█" * filled + "░" * (20 - filled)
+
+        speed = current / max(1, now - start_time)
+        speed = speed / 1024 / 1024
+
+        safe_edit(
+            msg,
+            f"⬆ Uploading...\n\n[{bar}] {percent}%\n\n⚡ {speed:.2f} MB/s",
+            progress_btn(uid)
+        )
+
+    try:
+        if ext.lower() in [".mp4", ".mkv"]:
+            app.send_video(
+                uid,
+                out,
+                caption=f"✅ {name}",
+                supports_streaming=True,
+                progress=uprog
+            )
+        else:
+            app.send_document(
+                uid,
+                out,
+                caption=f"✅ {name}",
+                progress=uprog
+            )
+
+        safe_edit(msg, "✅ Completed 🎉")
+
+    except Exception as e:
+        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
         return
-    last_update[0] = now
-
-    percent = int(current * 100 / total)
-    filled = percent // 5
-    bar = "█" * filled + "░" * (20 - filled)
-
-    speed = current / max(1, now - start_upload)
-    speed = speed / 1024 / 1024  # MB/s
-
-    safe_edit(
-        msg,
-        f"⬆ Uploading...\n\n[{bar}]\n\n🚀 {percent}%\n⚡ {speed:.2f} MB/s",
-        progress_btn(uid)
-    )
-
-try:
-    if ext.lower() in [".mp4", ".mkv"]:
-        app.send_video(
-            uid,
-            out,
-            caption=f"✅ {name}",
-            supports_streaming=True,
-            progress=uprog
-        )
-    else:
-        app.send_document(
-            uid,
-            out,
-            caption=f"✅ {name}",
-            progress=uprog
-        )
-
-    safe_edit(msg, "✅ Upload Completed 🎉")
-
-except Exception as e:
-    safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
-    return
 
     # ===== CLEANUP =====
     cleanup(out)
     user_mode[uid] = None
     user_action[uid] = None
-
-    safe_edit(msg, "✅ Completed 🎉")
 # ===== BULK SYSTEM =====
 
 def process_bulk(uid):
