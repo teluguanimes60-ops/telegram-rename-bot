@@ -378,10 +378,10 @@ try:
             file_name=f"{DOWNLOAD}/{time.time()}",
             progress=dprog
         )
-    except:
+    except Exception:
         safe_edit(msg, "❌ Download Cancelled")
         return
-
+        
     # ===== FILE NAME =====
     name = manual_name or saved_name.get(uid) or file.file_name or "AniToons"
     name = os.path.splitext(name)[0]
