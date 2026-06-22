@@ -183,17 +183,17 @@ def cb(_, q):
     elif data == "menu_convert":
         q.message.edit_text("🎬 Choose Convert Type", reply_markup=convert_menu())
 
-    # ===== CONVERT =====
-elif data == "convert_f2v":
-    user_action[uid] = "convert"
-    user_mode[uid] = "rename_choice"
-    q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
+# ===== CONVERT =====
+    elif data == "convert_f2v":
+        user_action[uid] = "convert"
+        user_mode[uid] = "rename_choice"
+        q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
 
-elif data == "convert_v2f":
-    user_action[uid] = "convert"
-    user_mode[uid] = "rename_choice"
-    q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
-
+    elif data == "convert_v2f":
+        user_action[uid] = "convert"
+        user_mode[uid] = "rename_choice"
+        q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
+        
     # ===== AUTO =====
     elif data == "rename_auto":
         user_action[uid] = "rename"
