@@ -360,62 +360,62 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, "❌ Download Cancelled")
         return
 
-    # ===== FILE NAME =====
-    name = manual_name or saved_name.get(uid) or getattr(file, "file_name", None) or "AniToons"
-    name = re.sub(r'\d+$', '', name).strip()
+# ===== FILE NAME =====
+name = manual_name or saved_name.get(uid) or getattr(file, "file_name", None) or "AniToons"
+name = re.sub(r'\d+$', '', name).strip()
 
-    ext = os.path.splitext(file.file_name or "file.mp4")[1] or ".mp4"
-    out = f"{OUTPUT}/{name}{ext}"
+ext = os.path.splitext(file.file_name or "file.mp4")[1] or ".mp4"
+out = f"{OUTPUT}/{name}{ext}"
 
-    try:
-        os.rename(path, out)
-    except Exception as e:
-        safe_edit(msg, f"❌ Rename Error\n{str(e)}")
-        return
+try:
+    os.rename(path, out)
+except Exception as e:
+    safe_edit(msg, f"❌ Rename Error\n{str(e)}")
+    return
 
-    print("Uploading file:", out)
+print("Uploading file:", out)
 
-    if not os.path.exists(out):
-        safe_edit(msg, "❌ File missing after rename")
-        return
+# check file exists
+if not os.path.exists(out):
+    safe_edit(msg, "❌ File missing after rename")
+    return
 
-    # ===== UPLOAD =====
-    safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
+# ===== UPLOAD =====
+safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
-    def uprog(c, t):
-        percent = int(c * 100 / t)
-        filled = percent // 5
-        bar = "█" * filled + "░" * (20 - filled)
+def uprog(c, t):
+    percent = int(c * 100 / t)
+    filled = percent // 5
+    bar = "█" * filled + "░" * (20 - filled)
+    safe_edit(msg, f"⬆ Uploading...\n\n[{bar}] {percent}%", progress_btn(uid))
 
-        safe_edit(msg, f"⬆ Uploading...\n\n[{bar}] {percent}%", progress_btn(uid))
+try:
+    if ext.lower() in [".mp4", ".mkv"]:
+        app.send_video(
+            chat_id=uid,
+            video=out,
+            caption=f"✅ {name}",
+            supports_streaming=True,
+            progress=uprog
+        )
+    else:
+        app.send_document(
+            chat_id=uid,
+            document=out,
+            caption=f"✅ {name}",
+            progress=uprog
+        )
 
-    try:
-        if ext.lower() in [".mp4", ".mkv"]:
-            app.send_video(
-                chat_id=uid,
-                video=out,
-                caption=f"✅ {name}",
-                supports_streaming=True,
-                progress=uprog
-            )
-        else:
-            app.send_document(
-                chat_id=uid,
-                document=out,
-                caption=f"✅ {name}",
-                progress=uprog
-            )
+except Exception as e:
+    safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
+    return
 
-    except Exception as e:
-        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
-        return
+# ===== CLEANUP =====
+cleanup(out)
+user_mode[uid] = None
+user_action[uid] = None
 
-    # ===== CLEANUP =====
-    cleanup(out)
-    user_mode[uid] = None
-    user_action[uid] = None
-
-    safe_edit(msg, "✅ Completed 🎉")
+safe_edit(msg, "✅ Completed 🎉")
     
 # ===== BULK SYSTEM =====
 
