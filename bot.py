@@ -338,7 +338,9 @@ def process(file, uid, manual_name=None):
     cancel_task[uid] = False
     msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn(uid))
 
-# ===== DOWNLOAD =====
+    start_time = time.time()
+
+    # ===== DOWNLOAD =====
     def dprog(c, t):
         if cancel_task.get(uid):
             raise Exception("Cancelled")
@@ -347,25 +349,22 @@ def process(file, uid, manual_name=None):
         filled = percent // 5
         bar = "█" * filled + "░" * (20 - filled)
 
-        safe_edit(msg, f"⬇ Downloading...\n\n[{bar}]\n\n⚡ {percent}%", progress_btn(uid))
+        safe_edit(msg, f"⬇ Downloading...\n\n[{bar}] {percent}%", progress_btn(uid))
 
     try:
         path = file.download(
             file_name=f"{DOWNLOAD}/{time.time()}",
             progress=dprog
         )
-    except Exception:
+    except:
         safe_edit(msg, "❌ Download Cancelled")
         return
-        
+
     # ===== FILE NAME =====
     name = manual_name or saved_name.get(uid) or getattr(file, "file_name", None) or "AniToons"
     name = re.sub(r'\d+$', '', name).strip()
 
-    ext = os.path.splitext(file.file_name or "file.mp4")[1]
-    if not ext:
-        ext = ".mp4"
-
+    ext = os.path.splitext(file.file_name or "file.mp4")[1] or ".mp4"
     out = f"{OUTPUT}/{name}{ext}"
 
     try:
@@ -373,46 +372,22 @@ def process(file, uid, manual_name=None):
     except Exception as e:
         safe_edit(msg, f"❌ Rename Error\n{str(e)}")
         return
-    # ===== CONVERT =====
-    if user_action.get(uid) == "convert":
-        new_out = f"{OUTPUT}/{time.time()}.mp4"
 
-        safe_edit(msg, "🎬 Converting...", progress_btn(uid))
+    # ===== UPLOAD =====
+    last_update = [0]
 
-        import imageio_ffmpeg
-        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-
-        subprocess.run([
-            ffmpeg_path,
-            "-y",
-            "-i", out,
-            new_out
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        cleanup(out)
-        out = new_out
-        ext = ".mp4"
-
-# ===== UPLOAD =====
-    last_update = {}
-    start_time = time.time()
-
-    def uprog(current, total):
-        if cancel_task.get(uid):
-            raise Exception("Cancelled")
-
+    def uprog(c, t):
         now = time.time()
 
-        # reduce spam edits (fast + smooth)
-        if uid in last_update and now - last_update[uid] < 0.8:
+        if now - last_update[0] < 0.8:
             return
-        last_update[uid] = now
+        last_update[0] = now
 
-        percent = int(current * 100 / total)
+        percent = int(c * 100 / t)
         filled = percent // 5
         bar = "█" * filled + "░" * (20 - filled)
 
-        speed = current / max(1, now - start_time)
+        speed = c / max(1, now - start_time)
         speed = speed / 1024 / 1024  # MB/s
 
         safe_edit(
@@ -422,7 +397,7 @@ def process(file, uid, manual_name=None):
         )
 
     try:
-        if ext in [".mp4", ".mkv"]:
+        if ext.lower() in [".mp4", ".mkv"]:
             app.send_video(
                 chat_id=uid,
                 video=out,
@@ -442,7 +417,7 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
         return
 
-    # ===== CLEAN =====
+    # ===== CLEANUP =====
     cleanup(out)
     user_mode[uid] = None
     user_action[uid] = None
