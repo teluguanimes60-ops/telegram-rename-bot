@@ -374,7 +374,7 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, f"❌ Rename Error\n{str(e)}")
         return
     # ===== CONVERT =====
-if False:
+    if user_action.get(uid) == "convert":
         new_out = f"{OUTPUT}/{time.time()}.mp4"
 
         safe_edit(msg, "🎬 Converting...", progress_btn(uid))
@@ -393,34 +393,55 @@ if False:
         out = new_out
         ext = ".mp4"
 
-print("Uploading file:", out)
-    # ===== UPLOAD =====
-last_update = {}
+# ===== UPLOAD =====
+    last_update = {}
+    start_time = time.time()
 
-def smart_progress(current, total, msg, uid, text):
-    now = time.time()
+    def uprog(current, total):
+        if cancel_task.get(uid):
+            raise Exception("Cancelled")
 
-    # 🚀 limit updates (reduce lag)
-    if uid in last_update and now - last_update[uid] < 0.8:
+        now = time.time()
+
+        # reduce spam edits (fast + smooth)
+        if uid in last_update and now - last_update[uid] < 0.8:
+            return
+        last_update[uid] = now
+
+        percent = int(current * 100 / total)
+        filled = percent // 5
+        bar = "█" * filled + "░" * (20 - filled)
+
+        speed = current / max(1, now - start_time)
+        speed = speed / 1024 / 1024  # MB/s
+
+        safe_edit(
+            msg,
+            f"⬆ Uploading...\n\n[{bar}] {percent}%\n\n⚡ {speed:.2f} MB/s",
+            progress_btn(uid)
+        )
+
+    try:
+        if ext in [".mp4", ".mkv"]:
+            app.send_video(
+                chat_id=uid,
+                video=out,
+                caption=f"✅ {name}",
+                supports_streaming=True,
+                progress=uprog
+            )
+        else:
+            app.send_document(
+                chat_id=uid,
+                document=out,
+                caption=f"✅ {name}",
+                progress=uprog
+            )
+
+    except Exception as e:
+        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
         return
-    last_update[uid] = now
 
-    percent = int(current * 100 / total)
-
-    # ⚡ 20 block clean bar (best for Telegram)
-    filled = percent // 5
-    bar = "█" * filled + "░" * (20 - filled)
-
-    speed = current / max(1, now - (last_update.get(f"start_{uid}", now)))
-    speed = speed / 1024 / 1024  # MB/s
-
-    safe_edit(
-        msg,
-        f"{text}\n\n"
-        f"[{bar}] {percent}%\n\n"
-        f"⚡ Speed: {speed:.2f} MB/s",
-        progress_btn(uid)
-    )
     # ===== CLEAN =====
     cleanup(out)
     user_mode[uid] = None
