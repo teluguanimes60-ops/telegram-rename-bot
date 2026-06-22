@@ -359,7 +359,7 @@ def process(file, uid, manual_name=None):
         return
         
     # ===== FILE NAME =====
-name = manual_name or saved_name.get(uid) or getattr(file, "file_name", None) or "AniToons"
+    name = manual_name or saved_name.get(uid) or getattr(file, "file_name", None) or "AniToons"
     name = re.sub(r'\d+$', '', name).strip()
 
     ext = os.path.splitext(file.file_name or "file.mp4")[1]
