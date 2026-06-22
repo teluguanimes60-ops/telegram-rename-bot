@@ -372,7 +372,6 @@ try:
 except Exception as e:
     safe_edit(msg, f"❌ Rename Error\n{str(e)}")
     return
-
 print("Uploading file:", out)
 
 # check file exists
