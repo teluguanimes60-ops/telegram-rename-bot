@@ -373,7 +373,13 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, f"❌ Rename Error\n{str(e)}")
         return
 
-# ===== UPLOAD =====
+print("Uploading file:", out)
+
+    if not os.path.exists(out):
+        safe_edit(msg, "❌ File missing after rename")
+        return
+
+    # ===== UPLOAD =====
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
     def uprog(c, t):
@@ -385,7 +391,7 @@ def process(file, uid, manual_name=None):
 
     try:
         if ext.lower() in [".mp4", ".mkv"]:
-            file._client.send_video(
+            app.send_video(
                 chat_id=uid,
                 video=out,
                 caption=f"✅ {name}",
@@ -393,7 +399,7 @@ def process(file, uid, manual_name=None):
                 progress=uprog
             )
         else:
-            file._client.send_document(
+            app.send_document(
                 chat_id=uid,
                 document=out,
                 caption=f"✅ {name}",
@@ -410,6 +416,13 @@ def process(file, uid, manual_name=None):
     user_action[uid] = None
 
     safe_edit(msg, "✅ Completed 🎉")
+
+# ===== CLEANUP (OUTSIDE) ✅
+cleanup(out)
+user_mode[uid] = None
+user_action[uid] = None
+
+safe_edit(msg, "✅ Completed 🎉")
     
 # ===== BULK SYSTEM =====
 
