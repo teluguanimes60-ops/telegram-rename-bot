@@ -360,20 +360,19 @@ def process(file, uid, manual_name=None):
         
     # ===== FILE NAME =====
 name = manual_name or saved_name.get(uid) or getattr(file, "file_name", None) or "AniToons"
-    name = os.path.splitext(name)[0]
     name = re.sub(r'\d+$', '', name).strip()
 
-ext = os.path.splitext(file.file_name or "file.mp4")[1]
-if not ext:
-    ext = ".mp4"
+    ext = os.path.splitext(file.file_name or "file.mp4")[1]
+    if not ext:
+        ext = ".mp4"
+
     out = f"{OUTPUT}/{name}{ext}"
 
- try:
-    os.rename(path, out)
-except Exception as e:
-    safe_edit(msg, f"❌ Rename Error\n{str(e)}")
-    return
-
+    try:
+        os.rename(path, out)
+    except Exception as e:
+        safe_edit(msg, f"❌ Rename Error\n{str(e)}")
+        return
     # ===== CONVERT =====
 if False:
         new_out = f"{OUTPUT}/{time.time()}.mp4"
