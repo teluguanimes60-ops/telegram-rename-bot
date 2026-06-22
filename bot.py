@@ -162,21 +162,7 @@ def start(_, m):
         "✨ **AniToons Bot Ready**\n\nChoose an option 👇",
         reply_markup=main_menu()
     )
-
-
-@app.on_callback_query()
-def cb(_, q):
-
-    uid = q.from_user.id
-    data = q.data
-    q.answer()
-
-    # ===== BACK =====
-    if data == "back_main":
-        user_mode[uid] = None
-        q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
-
-    # ===== MENU =====
+        
 @app.on_callback_query()
 def cb(_, q):
 
@@ -483,32 +469,6 @@ def bulk_start(_, m):
         ])
     )
 
-
-# ===== BULK BUTTONS =====
-
-@app.on_callback_query(filters.regex("start_bulk"))
-def start_bulk(_, q):
-    uid = q.from_user.id
-
-    files = bulk_files.get(uid, [])
-    if not files:
-        q.answer("No files!", show_alert=True)
-        return
-
-    q.message.edit_text(f"🚀 Starting Bulk ({len(files)})")
-    threading.Thread(target=process_bulk, args=(uid,)).start()
-
-
-@app.on_callback_query(filters.regex("cancel_bulk"))
-def cancel_bulk(_, q):
-    uid = q.from_user.id
-
-    bulk_mode[uid] = False
-    bulk_files[uid] = []
-
-    q.message.edit_text("❌ Bulk Cancelled", reply_markup=main_menu())
-
-
 # ===== CLEANUP SYSTEM =====
 
 def cleanup_all():
@@ -523,7 +483,6 @@ def cleanup_all():
                         os.remove(full)
                 except:
                     pass
-
 
 # ===== SAFE EDIT =====
 
