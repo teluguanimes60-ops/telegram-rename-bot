@@ -180,14 +180,13 @@ def cb(_, q):
     elif data == "menu_rename":
         q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
 
-    elif data == "menu_convert":
-        q.message.edit_text("🎬 Choose Convert Type", reply_markup=convert_menu())
+elif data == "menu_convert":
+    q.message.edit_text("🎬 Choose Convert Type", reply_markup=convert_menu())
 
-# ===== CONVERT =====
-    elif data == "convert_f2v":
-        user_action[uid] = "convert"
-        user_mode[uid] = "rename_choice"
-        q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
+elif data == "convert_f2v":
+    user_action[uid] = "convert"
+    user_mode[uid] = "rename_choice"
+    q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
 
     elif data == "convert_v2f":
         user_action[uid] = "convert"
@@ -374,13 +373,13 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, f"⬇ Downloading...\n\n[{bar}]\n\n⚡ {percent}%", progress_btn(uid))
 
 try:
-        path = file.download(
-            file_name=f"{DOWNLOAD}/{time.time()}",
-            progress=dprog
-        )
-    except Exception:
-        safe_edit(msg, "❌ Download Cancelled")
-        return
+    path = file.download(
+        file_name=f"{DOWNLOAD}/{time.time()}",
+        progress=dprog
+    )
+except Exception:
+    safe_edit(msg, "❌ Download Cancelled")
+    return
         
     # ===== FILE NAME =====
     name = manual_name or saved_name.get(uid) or file.file_name or "AniToons"
