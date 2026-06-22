@@ -359,17 +359,23 @@ def process(file, uid, manual_name=None):
         return
         
     # ===== FILE NAME =====
-    name = manual_name or saved_name.get(uid) or file.file_name or "AniToons"
+name = manual_name or saved_name.get(uid) or getattr(file, "file_name", None) or "AniToons"
     name = os.path.splitext(name)[0]
     name = re.sub(r'\d+$', '', name).strip()
 
-    ext = os.path.splitext(path)[1]
+ext = os.path.splitext(file.file_name or "file.mp4")[1]
+if not ext:
+    ext = ".mp4"
     out = f"{OUTPUT}/{name}{ext}"
 
+ try:
     os.rename(path, out)
+except Exception as e:
+    safe_edit(msg, f"❌ Rename Error\n{str(e)}")
+    return
 
     # ===== CONVERT =====
-    if user_action.get(uid) == "convert":
+if False:
         new_out = f"{OUTPUT}/{time.time()}.mp4"
 
         safe_edit(msg, "🎬 Converting...", progress_btn(uid))
@@ -388,6 +394,7 @@ def process(file, uid, manual_name=None):
         out = new_out
         ext = ".mp4"
 
+print("Uploading file:", out)
     # ===== UPLOAD =====
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
