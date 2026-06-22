@@ -177,34 +177,42 @@ def cb(_, q):
         q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
 
     # ===== MENU =====
+@app.on_callback_query()
+def cb(_, q):
+
+    uid = q.from_user.id
+    data = q.data
+    q.answer()
+
+    if data == "back_main":
+        user_mode[uid] = None
+        q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
+
     elif data == "menu_rename":
         q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
 
-elif data == "menu_convert":
-    q.message.edit_text("🎬 Choose Convert Type", reply_markup=convert_menu())
+    elif data == "menu_convert":
+        q.message.edit_text("🎬 Choose Convert Type", reply_markup=convert_menu())
 
-elif data == "convert_f2v":
-    user_action[uid] = "convert"
-    user_mode[uid] = "rename_choice"
-    q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
+    elif data == "convert_f2v":
+        user_action[uid] = "convert"
+        user_mode[uid] = "rename_choice"
+        q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
 
     elif data == "convert_v2f":
         user_action[uid] = "convert"
         user_mode[uid] = "rename_choice"
         q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
-        
-    # ===== AUTO =====
+
     elif data == "rename_auto":
         user_action[uid] = "rename"
         user_mode[uid] = "thumb"
         q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
 
-    # ===== MANUAL =====
     elif data == "rename_manual":
         user_mode[uid] = "rename_manual"
         q.message.edit_text("✏ Send new file name")
 
-    # ===== SAVED =====
     elif data == "rename_saved":
         if uid not in saved_name:
             q.message.edit_text(
@@ -217,7 +225,6 @@ elif data == "convert_f2v":
         user_mode[uid] = "thumb"
         q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
 
-    # ===== THUMB =====
     elif data == "thumb_auto":
         user_thumb_mode[uid] = "auto"
         user_mode[uid] = "ready"
@@ -237,22 +244,6 @@ elif data == "convert_f2v":
         user_mode[uid] = "ready"
         q.message.edit_text("📤 Send file")
 
-    # ===== BULK =====
-    elif data == "start_bulk":
-        files = bulk_files.get(uid, [])
-        if not files:
-            q.answer("No files!", show_alert=True)
-            return
-
-        q.message.edit_text(f"🚀 Starting Bulk ({len(files)} files)")
-        threading.Thread(target=process_bulk, args=(uid,)).start()
-
-    elif data == "cancel_bulk":
-        bulk_mode[uid] = False
-        bulk_files[uid] = []
-        q.message.edit_text("❌ Bulk Cancelled", reply_markup=main_menu())
-
-    # ===== CANCEL BUTTON =====
     elif data.startswith("cancel_"):
         cancel_task[uid] = True
         q.message.edit_text("❌ Cancelled")
@@ -361,7 +352,7 @@ def process(file, uid, manual_name=None):
     cancel_task[uid] = False
     msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn(uid))
 
-    # ===== DOWNLOAD =====
+# ===== DOWNLOAD =====
     def dprog(c, t):
         if cancel_task.get(uid):
             raise Exception("Cancelled")
@@ -372,14 +363,14 @@ def process(file, uid, manual_name=None):
 
         safe_edit(msg, f"⬇ Downloading...\n\n[{bar}]\n\n⚡ {percent}%", progress_btn(uid))
 
-try:
-    path = file.download(
-        file_name=f"{DOWNLOAD}/{time.time()}",
-        progress=dprog
-    )
-except Exception:
-    safe_edit(msg, "❌ Download Cancelled")
-    return
+    try:
+        path = file.download(
+            file_name=f"{DOWNLOAD}/{time.time()}",
+            progress=dprog
+        )
+    except Exception:
+        safe_edit(msg, "❌ Download Cancelled")
+        return
         
     # ===== FILE NAME =====
     name = manual_name or saved_name.get(uid) or file.file_name or "AniToons"
