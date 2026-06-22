@@ -416,13 +416,6 @@ def process(file, uid, manual_name=None):
     user_action[uid] = None
 
     safe_edit(msg, "✅ Completed 🎉")
-
-# ===== CLEANUP (OUTSIDE) ✅
-cleanup(out)
-user_mode[uid] = None
-user_action[uid] = None
-
-safe_edit(msg, "✅ Completed 🎉")
     
 # ===== BULK SYSTEM =====
 
