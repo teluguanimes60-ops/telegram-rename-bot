@@ -374,7 +374,7 @@ def process(file, uid, manual_name=None):
         safe_edit(msg, "❌ File missing after rename")
         return
 
-    # ===== UPLOAD =====
+# ===== UPLOAD =====
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
     def uprog(c, t):
@@ -382,25 +382,27 @@ def process(file, uid, manual_name=None):
         bar = "█" * (percent // 5) + "░" * (20 - percent // 5)
         safe_edit(msg, f"⬆ Uploading...\n\n[{bar}] {percent}%", progress_btn(uid))
 
-try:
-    if ext.lower() in [".mp4", ".mkv"]:
-        file.reply_video(
-            video=out,
-            caption=f"✅ {name}",
-            supports_streaming=True,
-            progress=uprog
-        )
-    else:
-        file.reply_document(
-            document=out,
-            caption=f"✅ {name}",
-            progress=uprog
-        )
+    try:
+        if ext.lower() in [".mp4", ".mkv"]:
+            app.send_video(
+                chat_id=uid,
+                video=out,
+                caption=f"✅ {name}",
+                supports_streaming=True,
+                progress=uprog
+            )
+        else:
+            app.send_document(
+                chat_id=uid,
+                document=out,
+                caption=f"✅ {name}",
+                progress=uprog
+            )
 
-except Exception as e:
-    print("UPLOAD ERROR:", e)
-    safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
-    return
+    except Exception as e:
+        print("UPLOAD ERROR:", e)
+        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
+        return
 
     # ===== CLEANUP =====
     cleanup(out)
@@ -408,7 +410,6 @@ except Exception as e:
     user_action[uid] = None
 
     safe_edit(msg, "✅ Completed 🎉")
-    
 # ===== BULK SYSTEM =====
 
 def process_bulk(uid):
