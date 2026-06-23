@@ -37,9 +37,7 @@ app = Client(
     "AniToonsBot",
     api_id=API_ID,
     api_hash=API_HASH,
-    bot_token=BOT_TOKEN,
-    workdir="/data",   # 🔥 VERY IMPORTANT FOR RENDER
-    plugins=dict(root="plugins")
+    bot_token=BOT_TOKEN
 )
 
 # ===== QUEUE =====
@@ -126,6 +124,18 @@ def cb(_, q):
     data = q.data
     q.answer()
 
+    # ===== START COMMAND =====
+
+@app.on_message(filters.command("start"))
+def start_cmd(_, m):
+
+    user_mode[m.from_user.id] = None
+
+    m.reply_text(
+        "🔥 AniToons Bot Ready\n\nChoose option 👇",
+        reply_markup=main_menu()
+    )
+    
     # ===== MAIN BUTTONS =====
 
     if data == "rename":
@@ -431,10 +441,19 @@ if __name__ == "__main__":
     # Start web server
     threading.Thread(target=run_web, daemon=True).start()
 
-while True:
-    try:
-        print("🚀 Starting Bot...")
+# ===== MAIN RUN =====
 
+if __name__ == "__main__":
+
+    print("🚀 AniToons Bot Starting...")
+
+    # Start workers
+    start_workers()
+
+    # Start web server
+    threading.Thread(target=run_web, daemon=True).start()
+
+    try:
         app.start()
         print("✅ Bot Connected")
 
@@ -444,11 +463,7 @@ while True:
         time.sleep(e.value)
 
     except Exception as e:
-        print("Restarting:", e)
-        time.sleep(5)
+        print("Error:", e)
 
     finally:
-        try:
-            app.stop()
-        except:
-            pass
+        app.stop()
