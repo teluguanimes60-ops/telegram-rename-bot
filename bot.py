@@ -1,6 +1,6 @@
 # ===== AniToons Rename Bot (CLEAN PRO v1) =====
 
-from pyrogram import Client, filters
+from pyrogram import Client, filters, idle
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
 from flask import Flask
@@ -510,11 +510,6 @@ if __name__ == "__main__":
 
     print("🚀 AniToons Bot Running...")
 
-    while True:
-        try:
-            app.run()
-        except FloodWait as e:
-            time.sleep(e.value)
-        except Exception as e:
-            print("Error:", e)
-            time.sleep(5)
+    app.start()
+    idle()
+    app.stop()
