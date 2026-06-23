@@ -37,7 +37,8 @@ app = Client(
     "AniToonsBot",
     api_id=API_ID,
     api_hash=API_HASH,
-    bot_token=BOT_TOKEN
+    bot_token=BOT_TOKEN,
+    plugins=dict(root="plugins")
 )
 
 # ===== QUEUE =====
@@ -112,13 +113,6 @@ def progress_btn(uid):
             InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_{uid}")
         ]
     ])
-
-# ===== START =====
-
-@app.on_message(filters.command("start"))
-def start(_, m):
-    user_mode[m.from_user.id] = None
-    m.reply_text("✨ AniToons Bot Ready", reply_markup=main_menu())
 
 # ===== CALLBACK =====
 
@@ -321,7 +315,7 @@ def process(file, uid, manual_name=None):
     try:
         # 🔥 IMPORTANT FIX (Render safe)
         if ext.lower() in [".mp4", ".mkv"]:
-            app.send_video(
+            file.reply_video(
                 chat_id=uid,
                 video=out,
                 caption=f"✅ {base_name}",
@@ -329,7 +323,7 @@ def process(file, uid, manual_name=None):
                 progress=uprog
             )
         else:
-            app.send_document(
+            file.reply_document(
                 chat_id=uid,
                 document=out,
                 caption=f"✅ {base_name}",
