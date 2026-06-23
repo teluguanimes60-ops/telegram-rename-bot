@@ -70,9 +70,6 @@ def main_menu():
         [
             InlineKeyboardButton("⚙ Settings", callback_data="settings"),
             InlineKeyboardButton("📊 Status", callback_data="status")
-        ],
-        [
-            InlineKeyboardButton("🔙 Back", callback_data="back")
         ]
     ])
 
@@ -123,6 +120,7 @@ def cb(_, q):
     uid = q.from_user.id
     data = q.data
     q.answer()
+    print("BUTTON CLICKED:", data)
 
     # ===== START COMMAND =====
 
