@@ -114,8 +114,6 @@ def progress_btn(uid):
         ]
     ])
 
-# ===== CALLBACK =====
-
 @app.on_callback_query()
 def cb(_, q):
 
@@ -123,56 +121,81 @@ def cb(_, q):
     data = q.data
     q.answer()
 
-    if data == "back_main":
-        user_mode[uid] = None
-        q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
+    # ===== MAIN BUTTONS =====
 
-    elif data == "menu_rename":
-        q.message.edit_text("Choose Rename Mode", reply_markup=rename_menu())
+    if data == "rename":
+        user_mode[uid] = "thumb"
+        q.message.edit_text(
+            "📁 Rename Mode\n\nChoose thumbnail 👇",
+            reply_markup=thumb_menu()
+        )
 
-    elif data == "menu_settings":
+    elif data == "convert":
+        q.message.edit_text("🎬 Convert coming soon...")
+
+    elif data == "settings":
         user_mode[uid] = None
-        q.message.edit_text("⚙ Settings", reply_markup=settings_menu())
+        q.message.edit_text(
+            "⚙ Settings",
+            reply_markup=settings_menu()
+        )
+
+    elif data == "status":
+        q.message.edit_text("📊 Bot is running perfectly ✅")
+
+    elif data == "back":
+        user_mode[uid] = None
+        q.message.edit_text(
+            "🏠 Main Menu",
+            reply_markup=main_menu()
+        )
+
+    # ===== RENAME FLOW =====
 
     elif data == "rename_auto":
         user_mode[uid] = "thumb"
-        q.message.edit_text("Choose Thumbnail", reply_markup=thumb_menu())
+        q.message.edit_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
 
     elif data == "rename_manual":
-        user_mode[uid] = "rename_manual"
-        q.message.edit_text("Send new file name")
+        user_mode[uid] = "get_name"
+        q.message.edit_text("✏ Send new file name")
+
+    # ===== THUMB =====
 
     elif data == "thumb_auto":
         user_thumb_mode[uid] = "auto"
         user_mode[uid] = "ready"
-        q.message.edit_text("Send file")
+        q.message.edit_text("📤 Send file")
 
     elif data == "thumb_saved":
         if uid not in user_saved_thumb:
             user_mode[uid] = "set_thumb"
-            q.message.edit_text("Send thumbnail first")
+            q.message.edit_text("❌ Send thumbnail first")
         else:
             user_thumb_mode[uid] = "saved"
             user_mode[uid] = "ready"
-            q.message.edit_text("Send file")
+            q.message.edit_text("📤 Send file")
 
     elif data == "thumb_none":
         user_thumb_mode[uid] = "none"
         user_mode[uid] = "ready"
-        q.message.edit_text("Send file")
+        q.message.edit_text("📤 Send file")
+
+    # ===== SETTINGS =====
 
     elif data == "set_name":
         user_mode[uid] = "set_name"
-        q.message.edit_text("Send name")
+        q.message.edit_text("✏ Send name")
 
     elif data == "set_thumb":
         user_mode[uid] = "set_thumb"
-        q.message.edit_text("Send thumbnail image")
+        q.message.edit_text("🖼 Send thumbnail")
+
+    # ===== CANCEL =====
 
     elif data.startswith("cancel_"):
         cancel_task[uid] = True
         q.message.edit_text("❌ Cancelled")
-
 # ===== FILE HANDLER =====
 
 @app.on_message(filters.document | filters.video | filters.audio)
