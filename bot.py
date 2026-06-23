@@ -273,13 +273,19 @@ def photo_handler(_, m):
 
 def worker():
     while True:
-        m, uid, mname = queue.get()
         try:
-            process(m, uid, mname)
-        except Exception as e:
-            print("Worker Error:", e)
-        queue.task_done()
+            m, uid, mname = queue.get()
 
+            try:
+                process(m, uid, mname)
+            except Exception as e:
+                print("Worker Error:", e)
+
+            queue.task_done()
+
+        except Exception as e:
+            print("Queue Crash:", e)
+            time.sleep(2)
 
 # ===== PROCESS FUNCTION =====
 
@@ -296,19 +302,24 @@ def process(file, uid, manual_name=None):
         bar = "█" * (percent // 5) + "░" * (20 - percent // 5)
         safe_edit(msg, f"⬇ Downloading...\n[{bar}] {percent}%", progress_btn(uid))
 
-    try:
-        path = file.download(
-            file_name=f"{DOWNLOAD}/{time.time()}",
-            progress=dprog
-        )
-    except Exception as e:
-        print("DOWNLOAD ERROR:", e)
+    # ✅ RETRY DOWNLOAD FIXED
+    for _ in range(3):
+        try:
+            path = file.download(
+                file_name=f"{DOWNLOAD}/{time.time()}",
+                progress=dprog
+            )
+            break
+        except Exception as e:
+            print("Retry Download:", e)
+            time.sleep(2)
+    else:
         safe_edit(msg, "❌ Download Failed")
         return
 
     # ===== FILE NAME =====
     base_name = manual_name or saved_name.get(uid) or file.file_name or "AniToons"
-    base_name = re.sub(r'\.[^.]+$', '', base_name)  # remove extension
+    base_name = re.sub(r'\.[^.]+$', '', base_name)
     base_name = base_name.strip()
 
     ext = os.path.splitext(file.file_name or "file.mp4")[1] or ".mp4"
@@ -335,27 +346,30 @@ def process(file, uid, manual_name=None):
         bar = "█" * (percent // 5) + "░" * (20 - percent // 5)
         safe_edit(msg, f"⬆ Uploading...\n[{bar}] {percent}%", progress_btn(uid))
 
-    try:
-        # 🔥 IMPORTANT FIX (Render safe)
-        if ext.lower() in [".mp4", ".mkv"]:
-            file.reply_video(
-                chat_id=uid,
-                video=out,
-                caption=f"✅ {base_name}",
-                supports_streaming=True,
-                progress=uprog
-            )
-        else:
-            file.reply_document(
-                chat_id=uid,
-                document=out,
-                caption=f"✅ {base_name}",
-                progress=uprog
-            )
-
-    except Exception as e:
-        print("UPLOAD ERROR:", e)
-        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
+    # ✅ RETRY UPLOAD FIXED
+    for _ in range(3):
+        try:
+            if ext.lower() in [".mp4", ".mkv"]:
+                app.send_video(
+                    chat_id=uid,
+                    video=out,
+                    caption=f"✅ {base_name}",
+                    supports_streaming=True,
+                    progress=uprog
+                )
+            else:
+                app.send_document(
+                    chat_id=uid,
+                    document=out,
+                    caption=f"✅ {base_name}",
+                    progress=uprog
+                )
+            break
+        except Exception as e:
+            print("Retry Upload:", e)
+            time.sleep(2)
+    else:
+        safe_edit(msg, "❌ Upload Failed")
         return
 
     # ===== CLEANUP =====
