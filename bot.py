@@ -38,6 +38,7 @@ app = Client(
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
+    workdir="/data",   # 🔥 VERY IMPORTANT FOR RENDER
     plugins=dict(root="plugins")
 )
 
@@ -420,24 +421,32 @@ if __name__ == "__main__":
 
     print("🚀 AniToons Bot Starting...")
 
-    # Start worker threads
+    # Start workers
     start_workers()
 
-    # Start web server (for Render)
+    # Start web server
     threading.Thread(target=run_web, daemon=True).start()
 
-    try:
-        app.start()
-        print("✅ Bot Started Successfully")
+    while True:
+        try:
+            app.start()
+            print("✅ Bot Connected")
 
-        idle()   # keeps bot alive
+            idle()  # wait here
 
-    except FloodWait as e:
-        print(f"FloodWait: {e.value}")
-        time.sleep(e.value)
+        except FloodWait as e:
+            print(f"FloodWait: {e.value}")
+            time.sleep(e.value)
 
-    except Exception as e:
-        print("Runtime Error:", e)
+        except Exception as e:
+            print("🔴 Connection Lost:", e)
+            time.sleep(5)
 
-    finally:
-        app.stop()
+        finally:
+            try:
+                app.stop()
+            except:
+                pass
+
+            print("🔁 Restarting bot...")
+            time.sleep(3)
