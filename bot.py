@@ -1,4 +1,4 @@
-# ===== AniToons Rename Bot (CLEAN PRO v1) =====
+# ===== AniToons Rename Bot (FIXED v2) =====
 
 from pyrogram import Client, filters, idle
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -6,11 +6,11 @@ from pyrogram.errors import FloodWait
 from flask import Flask
 from config import *
 
-import os, re, time, threading, subprocess
+import os, re, time, threading
 from queue import Queue
 
 # ===== CONFIG =====
-WORKERS = 3
+WORKERS = 2
 CHANNEL = "https://t.me/Anitoon_edit/33"
 
 # ===== FOLDERS =====
@@ -40,26 +40,16 @@ app = Client(
     bot_token=BOT_TOKEN
 )
 
-# ===== DATABASE =====
+# ===== QUEUE =====
 queue = Queue()
 
-# ===== USER STATES =====
+# ===== USER DATA =====
 user_mode = {}
-user_file = {}
 manual_name = {}
-
-# ===== SETTINGS =====
 saved_name = {}
 user_saved_thumb = {}
 user_thumb_mode = {}
-user_action = {}   # 🔥 IMPORTANT
-
-# ===== SYSTEM =====
 cancel_task = {}
-
-# ===== BULK =====
-bulk_mode = {}
-bulk_files = {}
 
 # ===== CLEANUP =====
 def cleanup(path):
@@ -69,42 +59,24 @@ def cleanup(path):
     except:
         pass
 
-# ===== UI MENUS =====
+# ===== MENUS =====
 
 def main_menu():
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📁 Rename", callback_data="menu_rename"),
-            InlineKeyboardButton("🎬 Convert", callback_data="menu_convert")
-        ],
-        [
-            InlineKeyboardButton("📦 Bulk Mode", callback_data="menu_bulk"),
             InlineKeyboardButton("⚙ Settings", callback_data="menu_settings")
         ],
         [
-            InlineKeyboardButton("📢 AniToon's List", url=CHANNEL)
+            InlineKeyboardButton("📢 Channel", url=CHANNEL)
         ]
     ])
 
 def rename_menu():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("⚡ Auto Rename", callback_data="rename_auto"),
-            InlineKeyboardButton("✏ Manual Rename", callback_data="rename_manual")
-        ],
-        [
-            InlineKeyboardButton("📌 Saved Rename", callback_data="rename_saved")
-        ],
-        [
-            InlineKeyboardButton("🔙 Back", callback_data="back_main")
-        ]
-    ])
-
-def convert_menu():
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("📹 File → Video", callback_data="convert_f2v"),
-            InlineKeyboardButton("📁 Video → File", callback_data="convert_v2f")
+            InlineKeyboardButton("⚡ Auto", callback_data="rename_auto"),
+            InlineKeyboardButton("✏ Manual", callback_data="rename_manual")
         ],
         [
             InlineKeyboardButton("🔙 Back", callback_data="back_main")
@@ -114,11 +86,11 @@ def convert_menu():
 def thumb_menu():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🤖 Auto Thumbnail", callback_data="thumb_auto"),
-            InlineKeyboardButton("🖼 Saved Thumbnail", callback_data="thumb_saved")
+            InlineKeyboardButton("🤖 Auto Thumb", callback_data="thumb_auto"),
+            InlineKeyboardButton("🖼 Saved Thumb", callback_data="thumb_saved")
         ],
         [
-            InlineKeyboardButton("🚫 No Thumbnail", callback_data="thumb_none")
+            InlineKeyboardButton("🚫 No Thumb", callback_data="thumb_none")
         ]
     ])
 
@@ -126,18 +98,7 @@ def settings_menu():
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📌 Set Name", callback_data="set_name"),
-            InlineKeyboardButton("🖼 Set Thumbnail", callback_data="set_thumb")
-        ],
-        [
-            InlineKeyboardButton("🔙 Back", callback_data="back_main")
-        ]
-    ])
-
-def bulk_menu():
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("▶ Start Bulk", callback_data="start_bulk"),
-            InlineKeyboardButton("❌ Cancel Bulk", callback_data="cancel_bulk")
+            InlineKeyboardButton("🖼 Set Thumb", callback_data="set_thumb")
         ],
         [
             InlineKeyboardButton("🔙 Back", callback_data="back_main")
@@ -157,12 +118,10 @@ def progress_btn(uid):
 @app.on_message(filters.command("start"))
 def start(_, m):
     user_mode[m.from_user.id] = None
+    m.reply_text("✨ AniToons Bot Ready", reply_markup=main_menu())
 
-    m.reply_text(
-        "✨ **AniToons Bot Ready**\n\nChoose an option 👇",
-        reply_markup=main_menu()
-    )
-        
+# ===== CALLBACK =====
+
 @app.on_callback_query()
 def cb(_, q):
 
@@ -175,64 +134,51 @@ def cb(_, q):
         q.message.edit_text("🏠 Main Menu", reply_markup=main_menu())
 
     elif data == "menu_rename":
-        q.message.edit_text("⚙ Choose Rename Type", reply_markup=rename_menu())
+        q.message.edit_text("Choose Rename Mode", reply_markup=rename_menu())
 
-    elif data == "menu_convert":
-        q.message.edit_text("🎬 Choose Convert Type", reply_markup=convert_menu())
-
-    elif data == "convert_f2v":
-        user_action[uid] = "convert"
-        user_mode[uid] = "rename_choice"
-        q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
-
-    elif data == "convert_v2f":
-        user_action[uid] = "convert"
-        user_mode[uid] = "rename_choice"
-        q.message.edit_text("✏ Choose rename type", reply_markup=rename_menu())
+    elif data == "menu_settings":
+        user_mode[uid] = None
+        q.message.edit_text("⚙ Settings", reply_markup=settings_menu())
 
     elif data == "rename_auto":
-        user_action[uid] = "rename"
         user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
+        q.message.edit_text("Choose Thumbnail", reply_markup=thumb_menu())
 
     elif data == "rename_manual":
         user_mode[uid] = "rename_manual"
-        q.message.edit_text("✏ Send new file name")
-
-    elif data == "rename_saved":
-        if uid not in saved_name:
-            q.message.edit_text(
-                "❌ You didn't set saved name\n\n👉 Go to Settings first",
-                reply_markup=settings_menu()
-            )
-            return
-
-        user_action[uid] = "rename"
-        user_mode[uid] = "thumb"
-        q.message.edit_text("🖼 Choose thumbnail", reply_markup=thumb_menu())
+        q.message.edit_text("Send new file name")
 
     elif data == "thumb_auto":
         user_thumb_mode[uid] = "auto"
         user_mode[uid] = "ready"
-        q.message.edit_text("📤 Send file")
+        q.message.edit_text("Send file")
 
     elif data == "thumb_saved":
         if uid not in user_saved_thumb:
             user_mode[uid] = "set_thumb"
-            q.message.edit_text("❌ Send thumbnail first")
+            q.message.edit_text("Send thumbnail first")
         else:
             user_thumb_mode[uid] = "saved"
             user_mode[uid] = "ready"
-            q.message.edit_text("📤 Send file")
+            q.message.edit_text("Send file")
 
     elif data == "thumb_none":
         user_thumb_mode[uid] = "none"
         user_mode[uid] = "ready"
-        q.message.edit_text("📤 Send file")
+        q.message.edit_text("Send file")
+
+    elif data == "set_name":
+        user_mode[uid] = "set_name"
+        q.message.edit_text("Send name")
+
+    elif data == "set_thumb":
+        user_mode[uid] = "set_thumb"
+        q.message.edit_text("Send thumbnail image")
 
     elif data.startswith("cancel_"):
         cancel_task[uid] = True
         q.message.edit_text("❌ Cancelled")
+
 # ===== FILE HANDLER =====
 
 @app.on_message(filters.document | filters.video | filters.audio)
@@ -241,27 +187,24 @@ def file_handler(_, m):
     uid = m.from_user.id
     mode = user_mode.get(uid)
 
-    # ===== READY (MAIN PROCESS) =====
+    # ===== READY → SEND TO QUEUE =====
     if mode == "ready":
         queue.put((m, uid, manual_name.get(uid)))
+        m.reply_text("⏳ Added to queue...")
         return
 
-    # ===== BULK MODE =====
-    if bulk_mode.get(uid):
-        bulk_files.setdefault(uid, []).append(m)
-        m.reply_text(f"📦 Added ({len(bulk_files[uid])})", reply_markup=bulk_menu())
-        return
-
-    # ===== MANUAL RENAME =====
+    # ===== MANUAL RENAME STEP =====
     if mode == "rename_manual":
-        user_file[uid] = m
-        m.reply_text("✏ Now send new file name")
+        user_mode[uid] = "get_name"
+        manual_name[uid] = None
+        m.reply_text("✏ Send new file name")
         return
 
-    # ===== BLOCK IF NOTHING SELECTED =====
+    # ===== BLOCK =====
     if not mode:
-        m.reply_text("❌ First press /start and choose option")
+        m.reply_text("❌ Use /start first")
         return
+
 
 # ===== TEXT HANDLER =====
 
@@ -271,27 +214,26 @@ def text_handler(_, m):
     uid = m.from_user.id
     mode = user_mode.get(uid)
 
-    # ===== MANUAL RENAME NAME INPUT =====
-    if mode == "rename_manual":
+    # ===== GET MANUAL NAME =====
+    if mode == "get_name":
         manual_name[uid] = m.text
         user_mode[uid] = "thumb"
-
         m.reply_text("🖼 Choose Thumbnail", reply_markup=thumb_menu())
         return
 
-    # ===== SET SAVED NAME =====
+    # ===== SAVE NAME =====
     if mode == "set_name":
         saved_name[uid] = m.text
         user_mode[uid] = None
-
-        m.reply_text("✅ Saved Name Updated", reply_markup=main_menu())
+        m.reply_text("✅ Name Saved", reply_markup=main_menu())
         return
 
     # ===== DEFAULT =====
     if mode:
-        m.reply_text("❌ Complete previous step properly")
+        m.reply_text("❌ Complete previous step")
 
-# ===== PHOTO HANDLER (THUMBNAIL) =====
+
+# ===== PHOTO HANDLER =====
 
 @app.on_message(filters.photo)
 def photo_handler(_, m):
@@ -299,50 +241,43 @@ def photo_handler(_, m):
     uid = m.from_user.id
     mode = user_mode.get(uid)
 
-    # ===== SAVE THUMBNAIL =====
+    # ===== SAVE THUMB =====
     if mode == "set_thumb":
         path = m.download(f"{THUMB}/{uid}.jpg")
         user_saved_thumb[uid] = path
         user_mode[uid] = None
-
         m.reply_text("✅ Thumbnail Saved", reply_markup=main_menu())
         return
 
-    # ===== IGNORE OTHER PHOTOS =====
-    m.reply_text("❌ Use this only in Settings → Set Thumbnail")
+    # ===== IGNORE =====
+    m.reply_text("❌ Use this in Settings only")
 
 # ===== WORKER SYSTEM =====
 
 def worker():
     while True:
-        data = queue.get()
-
+        m, uid, mname = queue.get()
         try:
-            if len(data) == 3:
-                process(data[0], data[1], data[2])
-            else:
-                process(data[0], data[1])
+            process(m, uid, mname)
         except Exception as e:
             print("Worker Error:", e)
-
         queue.task_done()
 
 
-# ===== START WORKERS =====
-def start_workers():
-    for _ in range(WORKERS):
-        threading.Thread(target=worker, daemon=True).start()
+# ===== PROCESS FUNCTION =====
 
 def process(file, uid, manual_name=None):
 
     cancel_task[uid] = False
-    msg = file.reply_text("⏳ Starting...", reply_markup=progress_btn(uid))
+    msg = file.reply_text("⏳ Processing...", reply_markup=progress_btn(uid))
 
     # ===== DOWNLOAD =====
     def dprog(c, t):
+        if cancel_task.get(uid):
+            raise Exception("Cancelled")
         percent = int(c * 100 / t)
         bar = "█" * (percent // 5) + "░" * (20 - percent // 5)
-        safe_edit(msg, f"⬇ Downloading...\n\n[{bar}] {percent}%", progress_btn(uid))
+        safe_edit(msg, f"⬇ Downloading...\n[{bar}] {percent}%", progress_btn(uid))
 
     try:
         path = file.download(
@@ -355,39 +290,41 @@ def process(file, uid, manual_name=None):
         return
 
     # ===== FILE NAME =====
-    name = manual_name or saved_name.get(uid) or getattr(file, "file_name", "AniToons")
-    name = re.sub(r'\d+$', '', name).strip()
+    base_name = manual_name or saved_name.get(uid) or file.file_name or "AniToons"
+    base_name = re.sub(r'\.[^.]+$', '', base_name)  # remove extension
+    base_name = base_name.strip()
 
     ext = os.path.splitext(file.file_name or "file.mp4")[1] or ".mp4"
-    out = f"{OUTPUT}/{name}{ext}"
+    out = f"{OUTPUT}/{base_name}{ext}"
 
     try:
         os.rename(path, out)
     except Exception as e:
         print("RENAME ERROR:", e)
-        safe_edit(msg, f"❌ Rename Error\n{str(e)}")
+        safe_edit(msg, "❌ Rename Error")
         return
-
-    print("DEBUG: Upload starting ->", out)
 
     if not os.path.exists(out):
-        safe_edit(msg, "❌ File missing after rename")
+        safe_edit(msg, "❌ File missing")
         return
 
-# ===== UPLOAD =====
+    # ===== UPLOAD =====
     safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
 
     def uprog(c, t):
+        if cancel_task.get(uid):
+            raise Exception("Cancelled")
         percent = int(c * 100 / t)
         bar = "█" * (percent // 5) + "░" * (20 - percent // 5)
-        safe_edit(msg, f"⬆ Uploading...\n\n[{bar}] {percent}%", progress_btn(uid))
+        safe_edit(msg, f"⬆ Uploading...\n[{bar}] {percent}%", progress_btn(uid))
 
     try:
+        # 🔥 IMPORTANT FIX (Render safe)
         if ext.lower() in [".mp4", ".mkv"]:
             app.send_video(
                 chat_id=uid,
                 video=out,
-                caption=f"✅ {name}",
+                caption=f"✅ {base_name}",
                 supports_streaming=True,
                 progress=uprog
             )
@@ -395,7 +332,7 @@ def process(file, uid, manual_name=None):
             app.send_document(
                 chat_id=uid,
                 document=out,
-                caption=f"✅ {name}",
+                caption=f"✅ {base_name}",
                 progress=uprog
             )
 
@@ -407,67 +344,8 @@ def process(file, uid, manual_name=None):
     # ===== CLEANUP =====
     cleanup(out)
     user_mode[uid] = None
-    user_action[uid] = None
 
     safe_edit(msg, "✅ Completed 🎉")
-# ===== BULK SYSTEM =====
-
-def process_bulk(uid):
-    files = bulk_files.get(uid, [])
-
-    if not files:
-        return
-
-    total = len(files)
-    done = 0
-
-    msg = app.send_message(uid, f"🚀 Starting Bulk\nTotal: {total}")
-
-    for f in files:
-        try:
-            process(f, uid)
-            done += 1
-            msg.edit_text(f"📦 Progress: {done}/{total}")
-        except:
-            msg.edit_text(f"⚠ Error at {done+1}")
-
-    bulk_files[uid] = []
-    bulk_mode[uid] = False
-
-    msg.edit_text("✅ Bulk Completed")
-
-
-# ===== BULK COMMAND =====
-
-@app.on_message(filters.command("bulk"))
-def bulk_start(_, m):
-    uid = m.from_user.id
-
-    bulk_mode[uid] = True
-    bulk_files[uid] = []
-
-    m.reply_text(
-        "📦 Bulk Mode ON\n\nSend files then press Start",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("▶ Start Bulk", callback_data="start_bulk")],
-            [InlineKeyboardButton("❌ Cancel Bulk", callback_data="cancel_bulk")]
-        ])
-    )
-
-# ===== CLEANUP SYSTEM =====
-
-def cleanup_all():
-    while True:
-        time.sleep(600)  # every 10 min
-
-        for folder in [DOWNLOAD, OUTPUT, THUMB]:
-            for file in os.listdir(folder):
-                try:
-                    full = os.path.join(folder, file)
-                    if os.path.isfile(full):
-                        os.remove(full)
-                except:
-                    pass
 
 # ===== SAFE EDIT =====
 
@@ -477,39 +355,58 @@ def safe_edit(msg, text, btn=None):
     except:
         pass
 
-# ===== START WORKERS =====
 
-def worker():
+# ===== AUTO CLEANUP SYSTEM =====
+
+def cleanup_all():
     while True:
-        data = queue.get()
+        time.sleep(600)  # every 10 minutes
 
-        try:
-            if len(data) == 3:
-                process(data[0], data[1], data[2])
-            else:
-                process(data[0], data[1])
-        except Exception as e:
-            print("Worker Error:", e)
+        for folder in [DOWNLOAD, OUTPUT, THUMB]:
+            try:
+                for file in os.listdir(folder):
+                    full = os.path.join(folder, file)
 
-        queue.task_done()
+                    if os.path.isfile(full):
+                        os.remove(full)
+            except Exception as e:
+                print("CLEANUP ERROR:", e)
 
 
 # ===== START CLEANER THREAD =====
 threading.Thread(target=cleanup_all, daemon=True).start()
 
+# ===== START WORKERS =====
 
-# ===== RUN BOT =====
-if __name__ == "__main__":
-
-    # Start workers
+def start_workers():
     for _ in range(WORKERS):
         threading.Thread(target=worker, daemon=True).start()
 
-    # Start web server
+
+# ===== MAIN RUN =====
+
+if __name__ == "__main__":
+
+    print("🚀 AniToons Bot Starting...")
+
+    # Start worker threads
+    start_workers()
+
+    # Start web server (for Render)
     threading.Thread(target=run_web, daemon=True).start()
 
-    print("🚀 AniToons Bot Running...")
+    try:
+        app.start()
+        print("✅ Bot Started Successfully")
 
-    app.start()
-    idle()
-    app.stop()
+        idle()   # keeps bot alive
+
+    except FloodWait as e:
+        print(f"FloodWait: {e.value}")
+        time.sleep(e.value)
+
+    except Exception as e:
+        print("Runtime Error:", e)
+
+    finally:
+        app.stop()
