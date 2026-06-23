@@ -18,18 +18,17 @@ def start(client, message):
 📌 Send a file or choose option below 👇
 """
 
-    buttons = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("📁 Rename", callback_data="rename"),
-            InlineKeyboardButton("🎬 Video Tools", callback_data="video")
-        ],
-        [
-            InlineKeyboardButton("⚙ Settings", callback_data="settings"),
-            InlineKeyboardButton("📊 Status", callback_data="status")
-        ],
-        [
-            InlineKeyboardButton("🔥 Premium", callback_data="premium")
-        ]
-    ])
-
+buttons = InlineKeyboardMarkup([
+    [
+        InlineKeyboardButton("📁 Rename", callback_data="rename"),
+        InlineKeyboardButton("🎬 Convert", callback_data="convert")
+    ],
+    [
+        InlineKeyboardButton("⚙ Settings", callback_data="settings"),
+        InlineKeyboardButton("📊 Status", callback_data="status")
+    ],
+    [
+        InlineKeyboardButton("🔙 Back", callback_data="back")
+    ]
+])
     message.reply_text(text, reply_markup=buttons)
