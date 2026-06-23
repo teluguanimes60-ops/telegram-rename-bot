@@ -382,7 +382,7 @@ def process(file, uid, manual_name=None):
         bar = "█" * (percent // 5) + "░" * (20 - percent // 5)
         safe_edit(msg, f"⬆ Uploading...\n\n[{bar}] {percent}%", progress_btn(uid))
 
-    try:
+try:
     if ext.lower() in [".mp4", ".mkv"]:
         file.reply_video(
             video=out,
