@@ -66,11 +66,15 @@ def cleanup(path):
 def main_menu():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📁 Rename", callback_data="menu_rename"),
-            InlineKeyboardButton("⚙ Settings", callback_data="menu_settings")
+            InlineKeyboardButton("📁 Rename", callback_data="rename"),
+            InlineKeyboardButton("🎬 Convert", callback_data="convert")
         ],
         [
-            InlineKeyboardButton("📢 Channel", url=CHANNEL)
+            InlineKeyboardButton("⚙ Settings", callback_data="settings"),
+            InlineKeyboardButton("📊 Status", callback_data="status")
+        ],
+        [
+            InlineKeyboardButton("🔙 Back", callback_data="back")
         ]
     ])
 
@@ -427,26 +431,24 @@ if __name__ == "__main__":
     # Start web server
     threading.Thread(target=run_web, daemon=True).start()
 
-    while True:
+while True:
+    try:
+        print("🚀 Starting Bot...")
+
+        app.start()
+        print("✅ Bot Connected")
+
+        idle()
+
+    except FloodWait as e:
+        time.sleep(e.value)
+
+    except Exception as e:
+        print("Restarting:", e)
+        time.sleep(5)
+
+    finally:
         try:
-            app.start()
-            print("✅ Bot Connected")
-
-            idle()  # wait here
-
-        except FloodWait as e:
-            print(f"FloodWait: {e.value}")
-            time.sleep(e.value)
-
-        except Exception as e:
-            print("🔴 Connection Lost:", e)
-            time.sleep(5)
-
-        finally:
-            try:
-                app.stop()
-            except:
-                pass
-
-            print("🔁 Restarting bot...")
-            time.sleep(3)
+            app.stop()
+        except:
+            pass
