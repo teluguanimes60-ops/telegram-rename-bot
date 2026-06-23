@@ -243,7 +243,7 @@ def file_handler(_, m):
 
     # ===== READY (MAIN PROCESS) =====
     if mode == "ready":
-        queue.put((m, uid))
+        queue.put((m, uid, manual_name.get(uid)))
         return
 
     # ===== BULK MODE =====
@@ -349,10 +349,68 @@ def process(file, uid, manual_name=None):
             file_name=f"{DOWNLOAD}/{time.time()}",
             progress=dprog
         )
-    except:
-        safe_edit(msg, "❌ Download Cancelled")
+    except Exception as e:
+        print("DOWNLOAD ERROR:", e)
+        safe_edit(msg, "❌ Download Failed")
         return
 
+    # ===== FILE NAME =====
+    name = manual_name or saved_name.get(uid) or getattr(file, "file_name", "AniToons")
+    name = re.sub(r'\d+$', '', name).strip()
+
+    ext = os.path.splitext(file.file_name or "file.mp4")[1] or ".mp4"
+    out = f"{OUTPUT}/{name}{ext}"
+
+    try:
+        os.rename(path, out)
+    except Exception as e:
+        print("RENAME ERROR:", e)
+        safe_edit(msg, f"❌ Rename Error\n{str(e)}")
+        return
+
+    print("DEBUG: Upload starting ->", out)
+
+    if not os.path.exists(out):
+        safe_edit(msg, "❌ File missing after rename")
+        return
+
+    # ===== UPLOAD =====
+    safe_edit(msg, "⬆ Uploading...", progress_btn(uid))
+
+    def uprog(c, t):
+        percent = int(c * 100 / t)
+        bar = "█" * (percent // 5) + "░" * (20 - percent // 5)
+        safe_edit(msg, f"⬆ Uploading...\n\n[{bar}] {percent}%", progress_btn(uid))
+
+    try:
+        if ext.lower() in [".mp4", ".mkv"]:
+            app.send_video(
+                chat_id=uid,
+                video=out,
+                caption=f"✅ {name}",
+                supports_streaming=True,
+                progress=uprog
+            )
+        else:
+            app.send_document(
+                chat_id=uid,
+                document=out,
+                caption=f"✅ {name}",
+                progress=uprog
+            )
+
+    except Exception as e:
+        print("UPLOAD ERROR:", e)
+        safe_edit(msg, f"❌ Upload Failed\n{str(e)}")
+        return
+
+    # ===== CLEANUP =====
+    cleanup(out)
+    user_mode[uid] = None
+    user_action[uid] = None
+
+    safe_edit(msg, "✅ Completed 🎉")
+    
     # ===== FILE NAME + UPLOAD (THIS MUST BE INSIDE FUNCTION) =====
     name = manual_name or saved_name.get(uid) or getattr(file, "file_name", None) or "AniToons"
     name = re.sub(r'\d+$', '', name).strip()
